@@ -73,6 +73,8 @@ class Config:
                 cprint(f"Missing configuration key: {e}", "red", attrs=["reverse", "blink"])
                 exit(1)
 
+
+
     @property
     def keypair(self) -> Keypair:
         try:
