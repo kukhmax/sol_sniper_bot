@@ -132,3 +132,5 @@ htmlcov/
 *.json
 *.csv
 exemples/
+*.json
+*./exemples/
