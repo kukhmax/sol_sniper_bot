@@ -134,4 +134,3 @@ htmlcov/
 exemples/
 *.json
 *.exemples/
-.venv/.ipynb_checkpoints
