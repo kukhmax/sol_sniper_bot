@@ -1,7 +1,5 @@
 import os
-import json
 import pandas as pd
-from datetime import datetime
 from time import sleep
 import logging
 import asyncio
@@ -16,10 +14,10 @@ from solana.exceptions import SolanaRpcException
 from solana.rpc.websocket_api import SolanaWsClientProtocol
 from websockets.exceptions import ConnectionClosedError, ProtocolError
 
-from solders.pubkey import Pubkey
-from solders.rpc.config import RpcTransactionLogsFilterMentions
-from solders.signature import Signature
-from solders.transaction_status import UiPartiallyDecodedInstruction, ParsedInstruction
+from solders.pubkey import Pubkey  # type: ignore
+from solders.rpc.config import RpcTransactionLogsFilterMentions  # type: ignore
+from solders.signature import Signature  # type: ignore
+from solders.transaction_status import UiPartiallyDecodedInstruction, ParsedInstruction  # type: ignore
 
 from termcolor import colored, cprint
 
@@ -179,6 +177,7 @@ async def get_tokens(signature: Signature, RaydiumLPV4: Pubkey) -> None:
         
 
         mint = tokens[0] if "111111111111111111111111111111111111" in str(tokens[1]) else tokens[1]
+        base = tokens[1] if "111111111111111111111111111111111111" in str(tokens[1]) else tokens[0]
         cprint(f"Link to RugCheck: https://api.rugcheck.xyz/v1/tokens/{mint}/report", "green")
 
 
@@ -194,9 +193,9 @@ async def get_tokens(signature: Signature, RaydiumLPV4: Pubkey) -> None:
         # Save data to CSV after each transaction
         save_to_csv(pool_data)
 
-        break
+        return str(base), str(mint), tokens[2]
 
-async def find_new_tokens():
+async def find_new_tokens(RaydiumLPV4: Pubkey = RaydiumLPV4):
     """
     Subscribe to logs of the RaydiumLPV4 program and 
     process every log instruction that mentions the program.
@@ -218,7 +217,8 @@ async def find_new_tokens():
                 logging.info(f"{i}")
 
                 try:
-                    await get_tokens(signature, RaydiumLPV4) 
+                    token0, token1, pool = await get_tokens(signature, RaydiumLPV4)
+                    return token0, token1, pool
                 except (AttributeError, SolanaRpcException) as err:
                      # Omitting httpx.HTTPStatusError: Client error '429 Too Many Requests'
                     logging.exception(err)
@@ -239,4 +239,4 @@ async def find_new_tokens():
 # Поиск новых пар добавленных в пул
 if __name__ == "__main__":
     RaydiumLPV4 = Pubkey.from_string(RaydiumLPV4)
-    asyncio.run(find_new_tokens())
+    asyncio.run(find_new_tokens(RaydiumLPV4))
