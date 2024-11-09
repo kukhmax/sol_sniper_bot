@@ -8,8 +8,10 @@ from termcolor import colored, cprint
 import asyncio
 import time
 import json
+from datetime import datetime
 
 from find_new_token import find_new_tokens
+from track_pnl import RaydiumPnLTracker
 
 from dotenv import load_dotenv
 
@@ -17,7 +19,7 @@ load_dotenv()  # take environment variables from .env.
 
 RaydiumLPV4 = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
 SECRET_KEY = os.getenv("PRIVATE_KEY")
-AMOUNT = 0.001
+AMOUNT = 0.1
 SLIPPAGE = 10
 PRIORITY_FEE = 0.00005
 
@@ -90,44 +92,51 @@ async def main():
     max_retries = 3
     retry_delay = 2
 
-    while True:
-        for attempt in range(max_retries):
-            try:
-            
-                data = await find_new_tokens(RaydiumLPV4)
-                await asyncio.sleep(5)
+    
+    # try:
+    for attempt in range(max_retries):                
+        
+        data = await find_new_tokens(RaydiumLPV4)
+        print("\n")
+        tracker = RaydiumPnLTracker(data[2], data[0], data[1])
+        while True:
+            cprint("finding current price...", "yellow")
+            print()
+            await asyncio.sleep(5)
+            start_price = tracker.get_current_transaction()
 
-                if data:
-                    pool_id = data[2]
-                    from_token = data[0]
-                    to_token = data[1]
-                    rug_check = f"https://api.rugcheck.xyz/v1/tokens/{to_token}/report"
+            if start_price:
+                tracker.track_pnl(start_price)
+                break
 
-                    response = requests.get(rug_check)
-                    if response.status_code == 200:
-                        rug_check_result = response.json()
-                        print()
-                        for item in rug_check_result["risks"]:
-                            cprint(f"{item['description']}. Score: {item['score']}. Level: {item['level']}", "magenta", attrs=["bold", "reverse"])
-                        cprint(f"================  Rug check score: {rug_check_result['score']} ================", "white", "on_cyan", attrs=["bold"])
-                        print()
 
-                    try:
-                        # await swap(pool_id, from_token, to_token, AMOUNT, SLIPPAGE, PRIORITY_FEE)
-                        break
-                    except Exception as e:
-                        cprint(f"Swap failed (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(retry_delay * (attempt + 1))
-                        else:
-                            raise Exception(f"Failed to complete swap after {max_retries} attempts")
-            
-            except Exception as e:
-                cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (attempt + 1))
-                else:
-                    raise Exception(f"Program failed after {max_retries} attempts: {str(e)}")
+                    # if data:
+                    #     pool_id = data[2]
+                    #     from_token = data[0]
+                    #     to_token = data[1]
+                    #     rug_check = f"https://api.rugcheck.xyz/v1/tokens/{to_token}/report"
+
+                        
+                        
+                        
+                        # try:
+                        #     # get_current_transaction(pool_id, from_token, to_token)
+                            
+                        #     # await swap(pool_id, from_token, to_token, AMOUNT, SLIPPAGE, PRIORITY_FEE)
+                        #     pass
+                        # except Exception as e:
+                        #     cprint(f"Swap failed (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
+                        #     if attempt < max_retries - 1:
+                        #         await asyncio.sleep(retry_delay * (attempt + 1))
+                        #     else:
+                        #         raise Exception(f"Failed to complete swap after {max_retries} attempts")
+                
+    # except Exception as e:
+    #     cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
+    #     if attempt < max_retries - 1:
+    #         await asyncio.sleep(retry_delay * (attempt + 1))
+    #     else:
+    #         raise Exception(f"Program failed after {max_retries} attempts: {str(e)}")
 
 
 if __name__ == "__main__":
