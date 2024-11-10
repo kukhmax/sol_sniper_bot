@@ -89,25 +89,35 @@ async def swap(pool_id, from_token, to_token, amount, slippage, priority_fee):
 
 async def main():
     RaydiumLPV4 = Pubkey.from_string("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")
-    max_retries = 3
+    max_retries = 5
     retry_delay = 2
 
-    
-    # try:
-    for attempt in range(max_retries):                
         
-        data = await find_new_tokens(RaydiumLPV4)
-        print("\n")
-        tracker = RaydiumPnLTracker(data[2], data[0], data[1])
-        while True:
-            cprint("finding current price...", "yellow")
-            print()
-            await asyncio.sleep(5)
-            start_price = tracker.get_current_transaction()
-
-            if start_price:
-                tracker.track_pnl(start_price)
+    for attempt in range(max_retries):
+        try:        
+            data = await find_new_tokens(RaydiumLPV4)
+            if data:
                 break
+        except Exception as e:
+            cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
+            await asyncio.sleep(10)
+        
+    tracker = RaydiumPnLTracker(data[2], data[0], data[1], 0.1)
+    while True:
+        try:
+            cprint("finding current price...", "yellow")
+            await asyncio.sleep(5)
+            start_price, cost_with_fee = tracker.get_price_for_current_transaction()
+            cprint("tracking PnL...", "green", attrs=["bold"])
+            
+            if start_price:
+                await asyncio.sleep(20)
+                _, _, pnl_percentage = tracker.track_pnl(start_price, cost_with_fee)
+                with open("pnl.txt", "a") as f:
+                    f.write(f"{datetime.now().strftime('%d-%m %H:%M:%S')} - {pnl_percentage:.2f}%\n")
+                break
+        except Exception as e:
+            cprint(f"Error while tracking PnL: {str(e)}", "red", attrs=["bold", "reverse"])
 
 
                     # if data:
@@ -131,12 +141,9 @@ async def main():
                         #     else:
                         #         raise Exception(f"Failed to complete swap after {max_retries} attempts")
                 
-    # except Exception as e:
-    #     cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
-    #     if attempt < max_retries - 1:
-    #         await asyncio.sleep(retry_delay * (attempt + 1))
-    #     else:
-    #         raise Exception(f"Program failed after {max_retries} attempts: {str(e)}")
+        except Exception as e:
+            cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
+            await asyncio.sleep(10)
 
 
 if __name__ == "__main__":
