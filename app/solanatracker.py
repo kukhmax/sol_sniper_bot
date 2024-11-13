@@ -112,7 +112,7 @@ class SolanaTracker:
         commitment = options.get("commitment", "processed")
         resend_interval = options.get("resend_interval", 1000)
         confirmation_check_interval = options.get("confirmation_check_interval", 1000)
-        skip_confirmation_check = options.get("skip_confirmation_check", False)
+        skip_confirmation_check = options.get("  ", False)
 
         last_valid_block_height = blockhash_with_expiry["last_valid_block_height"] - last_valid_block_height_buffer
 
@@ -129,18 +129,22 @@ class SolanaTracker:
                     tx_opts
         )
         signature = response.value
+        print(f"Transaction sent with signature: {signature}" , "     132: transaction_sender_and_confirmation_waiter(func)")  # Print the transaction 
 
         if skip_confirmation_check:
+            print(f"Transaction confirmed with signature: {str(signature)}" , "     135: transaction_sender_and_confirmation_waiter(func)")
             return str(signature)
         
         
         while retry_count <= confirmation_retries:
             try:
                 status_response: GetSignatureStatusesResp = await self.connection.get_signature_statuses([signature])
+                print(status_response, "     141: transaction_sender_and_confirmation_waiter(func)")
                 if status_response.value[0] is not None:
                     status = status_response.value[0]
 
                     if self.commitment_str_to_level(str(status.confirmation_status)) >= self.commitment_to_level(str(commitment)):
+                        print(f"Transaction confirmed with signature: {signature}" , "     145: transaction_sender_and_confirmation_waiter(func)")
                         return str(signature)
                     if status.err:
                         return status.err

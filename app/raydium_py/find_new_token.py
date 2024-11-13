@@ -109,7 +109,7 @@ def get_tokens_info(
     token0 = accounts[8]
     token1 = accounts[9]
     # Start logging
-    logging.info("find LP !!!")
+    logging.info("======= find LP !!! =======")
     logging.info(f"\n Token0: {token0}, \n Token1: {token1}, \n Pair: {pair}")
     return token0, token1, pair
 
@@ -167,7 +167,6 @@ async def get_tokens(signature: Signature, RaydiumLPV4: Pubkey) -> None:
         header = ["Token_Index", "Account Public Key"]
         print()
         cprint("│".join(f" {col.ljust(15)} " for col in header), "green", attrs=["bold"])
-        print()
         for row in data:
             cprint("│".join(f" {str(row[col]).ljust(15)} " for col in header), "green", attrs=["bold"])
         print()
@@ -224,7 +223,7 @@ async def find_new_tokens(RaydiumLPV4: Pubkey = RaydiumLPV4):
                     logging.exception(err)
                     logging.info("sleep for 5 seconds and try again")
                     cprint(f"========= Danger! Danger! ==========\n{err}\nSleep for 5 seconds and try again", "red", attrs=["reverse", "blink"])
-                    sleep(5)
+                    sleep(4)
                     continue
 
         except (ProtocolError, ConnectionClosedError) as err:
