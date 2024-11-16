@@ -49,7 +49,6 @@ def buy(pair_address: str, sol_in: float = .01, slippage: int = 5) -> bool:
         
         cprint("Fetching pool keys...", "green", attrs=["bold"])
         pool_keys = fetch_pool_keys(pair_address)
-        cprint(pool_keys)
         if pool_keys is None:
             cprint("No pool keys found...", "red", attrs=["bold", "reverse"])
             return None, False
@@ -65,7 +64,7 @@ def buy(pair_address: str, sol_in: float = .01, slippage: int = 5) -> bool:
         amount_out_with_slippage = amount_out * slippage_adjustment
         minimum_amount_out = int(amount_out_with_slippage * 10**token_decimal)
         logging.info(f"Amount In: {amount_in} | Minimum Amount Out: {minimum_amount_out}")
-        cprint(f"Amount In: {amount_in} | Minimum Amount Out: {minimum_amount_out}", "light_cyan", attrs=["bold"])
+        cprint(f"Amount In: {amount_in} | Minimum Amount Out: {minimum_amount_out}", "yellow", attrs=["bold"])
 
 
         cprint("Checking for existing token account...", "cyan", attrs=["bold"])
@@ -107,7 +106,7 @@ def buy(pair_address: str, sol_in: float = .01, slippage: int = 5) -> bool:
             )
         )
         
-        cprint("Funding WSOL account...", "cyan", attrs=["bold"])
+        cprint("Funding WSOL account...", "yellow", attrs=["bold"])
         fund_wsol_account_instr = transfer(
             TransferParams(
                 from_pubkey=payer_keypair.pubkey(),
@@ -170,36 +169,36 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
             cprint("Percentage must be between 1 and 100.", "magenta", attrs=["bold", "reverse"])
             return False
 
-        logging.info("Fetching pool keys...", "green", attrs=["bold"])
+        cprint("Fetching pool keys...", "green", attrs=["bold"])
         pool_keys = fetch_pool_keys(pair_address)
         if pool_keys is None:
-            logging.error("No pool keys found...", "red", attrs=["bold", "reverse"])
+            cprint("No pool keys found...", "red", attrs=["bold", "reverse"])
             return False
-        logging.info(colored("Pool keys fetched successfully.", "white", "on_light_green", attrs=['bold']))
+        cprint("Pool keys fetched successfully.", "white", "on_light_green", attrs=['bold'])
 
         mint = pool_keys['base_mint'] if str(pool_keys['base_mint']) != SOL else pool_keys['quote_mint']
         
-        logging.info(colored("Retrieving token balance...", "blue", attrs=["bold"]))
+        cprint("Retrieving token balance...", "blue", attrs=["bold"])
         token_balance = get_token_balance(str(mint))
-        logging.info(colored("Token Balance: {token_balance}", "light_yellow", attrs=["bold"]))    
+        cprint("Token Balance: {token_balance}", "light_yellow", attrs=["bold"]) 
         if token_balance == 0:
-            print("No token balance available to sell.")
+            cprint("No token balance available to sell.", "red", attrs=["bold", "reverse"])
             return False
         token_balance = token_balance * (percentage / 100)
-        logging.info(colored(f"Selling {percentage}% of the token balance, adjusted balance: {token_balance}", "green", attrs=["bold"]))
+        cprint(f"Selling {percentage}% of the token balance, adjusted balance: {token_balance}", "green", attrs=["bold"])
 
-        logging.info(colored("Calculating transaction amounts...", "blue", attrs=["bold"]))
+        cprint("Calculating transaction amounts...", "blue", attrs=["bold"])
         token_price, token_decimal = get_token_price(pool_keys)
         amount_out = float(token_balance) * float(token_price)
         slippage_adjustment = 1 - (slippage / 100)
         amount_out_with_slippage = amount_out * slippage_adjustment
         minimum_amount_out = int(amount_out_with_slippage * SOL_DECIMAL)
         amount_in = int(token_balance * 10**token_decimal)
-        logging.info(colored(f"Amount In: {amount_in} | Minimum Amount Out: {minimum_amount_out}", "magenta"))
+        cprint(f"Amount In: {amount_in} | Minimum Amount Out: {minimum_amount_out}", "magenta")
 
         token_account = get_associated_token_address(payer_keypair.pubkey(), mint)
 
-        logging.info(colored("Generating seed and creating WSOL account...", "cyan", attrs=["bold"]))
+        cprint("Generating seed and creating WSOL account...", "cyan", attrs=["bold"])
         seed = base64.urlsafe_b64encode(os.urandom(24)).decode('utf-8')
         wsol_token_account = Pubkey.create_with_seed(payer_keypair.pubkey(), seed, TOKEN_PROGRAM_ID)
         balance_needed = Token.get_min_balance_rent_for_exempt_for_account(client)
@@ -225,10 +224,10 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
             )
         )
 
-        logging.info(colored("Creating swap instructions...", "light_yellow"))
+        cprint("Creating swap instructions...", "light_yellow")
         swap_instructions = make_swap_instruction(amount_in, minimum_amount_out, token_account, wsol_token_account, pool_keys, payer_keypair)
         
-        logging.info(colored("Preparing to close WSOL account after swap...", "light_cyan", attrs=["bold"])) 
+        cprint("Preparing to close WSOL account after swap...", "light_cyan", attrs=["bold"])
         close_wsol_account_instr = close_account(CloseAccountParams(TOKEN_PROGRAM_ID, wsol_token_account, payer_keypair.pubkey(), payer_keypair.pubkey()))
         
         instructions = [
@@ -241,7 +240,7 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
         ]
         
         if percentage == 100:
-            logging.info(colored("Preparing to close token account after swap...", "light_yellow", attrs=["bold"]))
+            cprint("Preparing to close token account after swap...", "light_yellow", attrs=["bold"])
             close_token_account_instr = close_account(
                 CloseAccountParams(TOKEN_PROGRAM_ID, token_account, payer_keypair.pubkey(), payer_keypair.pubkey())
             )
@@ -255,22 +254,22 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
             client.get_latest_blockhash().value.blockhash,
         )
 
-        logging.info(colored("Sending transaction...", "light_blue", attrs=["bold"]))
+        cprint("Sending transaction...", "light_blue", attrs=["bold"])
         txn_sig = client.send_transaction(
             txn = VersionedTransaction(compiled_message, [payer_keypair]), 
             opts = TxOpts(skip_preflight=True)
             ).value
         
-        logging.info(colored(f"Transaction Signature: {txn_sig}", "light_grey", attrs=["bold"]))
+        cprint(f"Transaction Signature: {txn_sig}", "light_grey", attrs=["bold"])
 
-        logging.info(colored("Confirming transaction...", "cyan", attrs=["bold"]))
+        cprint("Confirming transaction...", "cyan", attrs=["bold"])
         confirmed = confirm_txn(txn_sig)
-        logging.info(colored(f"Transaction confirmed: {confirmed}", "white", "on_light_green", attrs=["bold"]))
+        cprint(f"Transaction confirmed: {confirmed}", "white", "on_light_green", attrs=["bold"])
 
         cprint(f"Link to transaction in explorer : https://explorer.solana.com/tx/{txn_sig}", "magenta", "on_white")
         
-        return confirmed
+        return confirmed, txn_sig
     
     except Exception as e:
-        logging.error(colored(f"Error occurred during transaction: {str(e)}", "red", attrs=["bold", "reverse"]))
+        cprint(f"Error occurred during transaction: {str(e)}", "red", attrs=["bold", "reverse"])
         return False

@@ -31,14 +31,12 @@ logging.basicConfig(
 )
 
 class RaydiumPnLTracker:
-    def __init__(self, pool_id, from_token, to_token, amount=0.01, stop_loss=-15, take_profit=40, rpc_url="https://api.mainnet-beta.solana.com"):
+    def __init__(self, pool_id, from_token, to_token, amount=0.001, rpc_url="https://api.mainnet-beta.solana.com"):
         self.client = Client(rpc_url)
         self.pool_id = pool_id
         self.from_token = from_token
         self.to_token = to_token
         self.amount = amount
-        self.stop_loss = stop_loss
-        self.take_profit = take_profit
 
     def get_price_for_current_transaction(self):
         # try:
@@ -113,31 +111,25 @@ class RaydiumPnLTracker:
                                     diffs[new_token] = abs(diff)
                 # cprint(diffs, "magenta", attrs=["bold"])
                 bought_tokens_amount = diffs[new_token]
-                cprint(f"Amount of new token: +{bought_tokens_amount:.4f} tokens ", "magenta", attrs=["bold"])
+                # cprint(f"Amount of new token: +{bought_tokens_amount:.4f} tokens ", "magenta", attrs=["bold"])
                 
                 # print()
                 try:     
                     current_price = diffs[sol] / diffs[new_token]
                 except ZeroDivisionError:
                     current_price = 0
-                print(colored(f"Current price: ", "magenta"), colored(f"{current_price:.14f} ", "yellow", attrs=["bold"]),
-                      colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
+                # print(colored(f"Current price: ", "magenta"), colored(f"{current_price:.14f} ", "yellow", attrs=["bold"]),
+                #       colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
 
                 return current_price, bought_tokens_amount, cost_of_swap_with_fee
+            return None
         except requests.exceptions.Timeout:
             cprint("Request timed out, retrying...", "yellow")
-            time.sleep(1)
-            # continue
-        except Exception as e:
-            cprint(f"Ошибка при получении цены: {e}", "red", attrs=["bold", "reverse"])
-            time.sleep(10)
-            return None
-
-    def track_pnl(self, bought_price, cost_with_fee):
-        while True:
+        
+    def get_pnl(self, bought_price):
             # try:
 
-                amount_of_new_token = abs(cost_with_fee / bought_price)
+                # amount_of_new_token = abs(cost_with_fee / bought_price)
                 # cprint(f"Amount of new token with fee: +{amount_of_new_token:.4f} tokens ", "white", attrs=["bold"])
 
                 current_price, _ = self.get_price_for_current_transaction()
@@ -147,19 +139,13 @@ class RaydiumPnLTracker:
                     pnl_percentage = ((current_price - bought_price) / bought_price) * 100
 
                     color_pnl = "on_green" if pnl_percentage >= 0 else "on_red"
-                    cprint(f"Bought price: {bought_price:.10f}", "white", attrs=["bold"])
+                    print(colored(f"Bought price: {bought_price:.10f}", "white", attrs=["bold"]), 
+                          colored(f"Current price: {current_price:.10f}", "black", "on_white", attrs=["bold"]),
+                          colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
                     print(colored("PnL:   ", "yellow", attrs=["bold"]), end="")
                     print(colored(f" {pnl:.14f} ({pnl_percentage:.2f}%)", "white",color_pnl, attrs=["bold"]),
                           colored(f" Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "white", attrs=["bold"]))
-                    if pnl_percentage > self.take_profit:
-                        print(colored(f"Take profit {pnl_percentage:.2f}% reached!!!", "green", attrs=["bold"]))
-                        return current_price, pnl, pnl_percentage
-                    if pnl_percentage < self.stop_loss:
-                        print(colored(f"Stop loss {pnl_percentage:.2f}% reached!!!", "red", attrs=["bold"]))
-                        return current_price, pnl, pnl_percentage
-                time.sleep(3)
-            # except Exception as e:
-            #     cprint(f"Error while getting pnl: {str(e)}", "red", attrs=["bold", "reverse"])
+                return current_price, pnl, pnl_percentage
 
 
 if __name__ == "__main__":
