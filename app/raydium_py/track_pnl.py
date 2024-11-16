@@ -88,27 +88,31 @@ class RaydiumPnLTracker:
                 new_token = self.from_token if self.from_token != "So11111111111111111111111111111111111111112" else self.to_token
 
                 diffs = {sol: 0, new_token: 0}
-                for pre in pre_balance:                    
-                    for post in post_balance:                       
-                        if pre.account_index == post.account_index:                            
+                try:
+                    for pre in pre_balance:                    
+                        for post in post_balance:                       
+                            if pre.account_index == post.account_index:                            
 
-                            pre_ui_amount = float(pre.ui_token_amount.ui_amount_string)
-                            post_ui_amount = float(post.ui_token_amount.ui_amount_string)
-                            decimal = post.ui_token_amount.decimals             
-                            diff = round(post_ui_amount - pre_ui_amount, decimal)
-                            pre_mint = str(pre.mint)
-                            post_mint = str(post.mint)
-                            
-                            
-                            if abs(diff) > 0:
-                                # print(colored(f"Account index: {pre.account_index} <> {post.account_index}", "light_yellow", attrs=["bold", "reverse"]), 
-                                # colored(pre_mint, "white", "on_black"), colored(post_mint, "white", "on_black"), 
-                                # colored(f" amount: {pre_ui_amount} - {post_ui_amount} = {diff}", "cyan"))
-                                                
-                                if pre_mint == sol:
-                                    diffs[sol] = abs(diff)
-                                elif pre_mint == new_token:
-                                    diffs[new_token] = abs(diff)
+                                pre_ui_amount = float(pre.ui_token_amount.ui_amount_string)
+                                post_ui_amount = float(post.ui_token_amount.ui_amount_string)
+                                decimal = post.ui_token_amount.decimals             
+                                diff = round(post_ui_amount - pre_ui_amount, decimal)
+                                pre_mint = str(pre.mint)
+                                post_mint = str(post.mint)
+                                
+                                
+                                if abs(diff) > 0:
+                                    # print(colored(f"Account index: {pre.account_index} <> {post.account_index}", "light_yellow", attrs=["bold", "reverse"]), 
+                                    # colored(pre_mint, "white", "on_black"), colored(post_mint, "white", "on_black"), 
+                                    # colored(f" amount: {pre_ui_amount} - {post_ui_amount} = {diff}", "cyan"))
+                                                    
+                                    if pre_mint == sol:
+                                        diffs[sol] = abs(diff)
+                                    elif pre_mint == new_token:
+                                        diffs[new_token] = abs(diff)
+                except Exception as e:
+                    cprint(f"Error while getting diffs: {str(e)}", "red", attrs=["bold", "reverse"])
+                # print()
                 # cprint(diffs, "magenta", attrs=["bold"])
                 bought_tokens_amount = diffs[new_token]
                 # cprint(f"Amount of new token: +{bought_tokens_amount:.4f} tokens ", "magenta", attrs=["bold"])
@@ -125,7 +129,7 @@ class RaydiumPnLTracker:
             return None
         except requests.exceptions.Timeout:
             cprint("Request timed out, retrying...", "yellow")
-        
+            
     def get_pnl(self, bought_price):
             # try:
 
