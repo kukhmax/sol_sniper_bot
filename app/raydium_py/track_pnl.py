@@ -48,9 +48,8 @@ class RaydiumPnLTracker:
                 # Получаем подпись последней транзакции
                 latest_signature = signatures_response.value[0].signature
             
-                price, _, price_with_fee = self.get_current_price(latest_signature)
-                # print("52 line", price, price_with_fee)
-                return price, price_with_fee
+                price, bought_tokens_amount, cost_of_swap_with_fee, swap_commision = self.get_current_price(latest_signature)
+                return price
             
         # except Exception as e:
         #     cprint(f"Error while getting current transaction: {str(e)}", "red", attrs=["bold", "reverse"])
@@ -74,12 +73,31 @@ class RaydiumPnLTracker:
                 # Печать последней транзакции
                 transaction = transaction_response.value.transaction
                 tx_signature = transaction.transaction.signatures[0]
-                # cprint(f"Link to transaction in explorer : https://explorer.solana.com/tx/{tx_signature}", "magenta", "on_light_green")
+                with open("swap_transactions.json", 'a', encoding='utf-8') as raw_transactions:
+                    raw_transactions.write(transaction.to_json())
+                    raw_transactions.write(",\n")
+
+                transaction_json = json.loads(transaction.to_json())
+                account_keys = list(transaction_json.get('transaction', {}).get('message').get('accountKeys'))
+                acc_keys = [key.get('pubkey') for key in account_keys]
+                if 'GkCpJYoX9WtWFVPiWieJfU2dsNw8oyJAnLSj3xnMeEtW' in acc_keys:
+                    comm_index = acc_keys.index('GkCpJYoX9WtWFVPiWieJfU2dsNw8oyJAnLSj3xnMeEtW')
+                    swap_commision = (post_balances[comm_index] - pre_balances[comm_index]) / 1000000000  # коммиссия в SOL за swap
+                else:
+                    swap_commision = 0
 
                 pre_balances = transaction.meta.pre_balances
                 post_balances = transaction.meta.post_balances
-                cost_of_swap_with_fee = (post_balances[0] - pre_balances[0]) / 1000000000
-                # cprint(f"Стоимость транзакции c коммиссией: {cost_of_swap_with_fee:.9f} SOL", "light_green")
+            
+                
+                cost_of_swap_with_fee = (post_balances[0] - pre_balances[0]) / 1000000000  # стоимость swap в SOL c коммиссии
+                
+                print(f"Стоимость транзакции c коммиссией: {cost_of_swap_with_fee:.9f} SOL")
+                print(f"Коммиссия за swap: {swap_commision:.9f} SOL")
+
+                
+                # cprint(f"Link to transaction in explorer : https://explorer.solana.com/tx/{tx_signature}", "magenta", "on_light_green")
+
 
                 pre_balance = transaction.meta.pre_token_balances
                 post_balance = transaction.meta.post_token_balances
@@ -115,65 +133,73 @@ class RaydiumPnLTracker:
                 # print()
                 # cprint(diffs, "magenta", attrs=["bold"])
                 bought_tokens_amount = diffs[new_token]
-                # cprint(f"Amount of new token: +{bought_tokens_amount:.4f} tokens ", "magenta", attrs=["bold"])
+                cprint(f"Amount of new token: {bought_tokens_amount:.8f} tokens ", "magenta", attrs=["bold"])
                 
-                # print()
+                print()
                 try:     
-                    current_price = diffs[sol] / diffs[new_token]
+                    price = diffs[sol] / diffs[new_token]
                 except ZeroDivisionError:
-                    current_price = 0
-                # print(colored(f"Current price: ", "magenta"), colored(f"{current_price:.14f} ", "yellow", attrs=["bold"]),
-                #       colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
+                    price = 0
+                
+                print(colored(f"Current price: ", "magenta"), colored(f"{price:.14f} ", "yellow", attrs=["bold"]),
+                      colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
 
-                return current_price, bought_tokens_amount, cost_of_swap_with_fee
-            return None
+                return (
+                    price, 
+                    bought_tokens_amount, 
+                    cost_of_swap_with_fee, 
+                    swap_commision
+                )
         except requests.exceptions.Timeout:
             cprint("Request timed out, retrying...", "yellow")
             
-    def get_pnl(self, bought_price):
-            # try:
+    def get_pnl(self, bought_price,
+                token_amount,
+                bought_amount_with_fee,
+                swap_commision):
+            try:
 
                 # amount_of_new_token = abs(cost_with_fee / bought_price)
                 # cprint(f"Amount of new token with fee: +{amount_of_new_token:.4f} tokens ", "white", attrs=["bold"])
 
-                current_price, _ = self.get_price_for_current_transaction()
-                
+                current_price = self.get_price_for_current_transaction()
+                print(colored(f"Real bought price: {bought_price:.10f}", "white", "on_blue", attrs=["bold"]), end="     ")
+                cprint(f"Real current price: {current_price:.10f}", "white", attrs=["bold"])
                 if current_price:
-                    pnl = current_price - bought_price
-                    pnl_percentage = ((current_price - bought_price) / bought_price) * 100
+                    zero_price = bought_amount_with_fee / token_amount  # Цена покупки с расчетом комиссии
+                    current_price_with_fee = ((current_price * token_amount) - swap_commision) / token_amount  # Цена последней транзакции с расчетом комиссии при продаже
+                    
+                    pnl = current_price_with_fee - zero_price
+                    pnl_percentage = ((pnl) / zero_price) * 100
 
                     color_pnl = "on_green" if pnl_percentage >= 0 else "on_red"
-                    print(colored(f"Bought price: {bought_price:.10f}", "white", attrs=["bold"]), 
-                          colored(f"Current price: {current_price:.10f}", "black", "on_white", attrs=["bold"]),
+                    print(colored(f"     Bought price: {zero_price:.10f}", "white", attrs=["bold"]), 
+                          colored(f"Current price with fee: {current_price_with_fee:.10f}", "black", "on_white", attrs=["bold"]),
                           colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
                     print(colored("PnL:   ", "yellow", attrs=["bold"]), end="")
                     print(colored(f" {pnl:.14f} ({pnl_percentage:.2f}%)", "white",color_pnl, attrs=["bold"]),
                           colored(f" Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "white", attrs=["bold"]))
-                return current_price, pnl, pnl_percentage
+                return pnl_percentage
+            except Exception as e:
+                cprint(f"Error while getting PnL: {str(e)}", "red", attrs=["bold", "reverse"])
 
 
 if __name__ == "__main__":
     print(f"Текущая дата и время: {datetime.now()}")
-    pool_id = Pubkey.from_string("JCRPUZNM4HqF2fBLToZsmUUFsFYaF9GdFMSWRKxvtn8b")
+    pool_id = Pubkey.from_string("91oH2wJ7xDRsx3GYYuswnzLvphWgM6LDBjBBrFNPmCx3")
     from_token = "So11111111111111111111111111111111111111112" 
-    to_token = "AKrpsGJrLqWLMzBkY5z1QFHN92SmahWL2s72241Lpump"
+    to_token = "9t7DR2z3YFn89YbVeC3McanptdAhbNNwhJXCcCVnpump"
     tracker = RaydiumPnLTracker(pool_id, from_token, to_token, 0.1)
-    # tracker.get_price_for_current_transaction()
-    # signature = Signature(base58.b58decode("bZKmJ9L3WQU6X3PLmzQmxe6MCygfPMfB6t6w7ksnBiZMmBribwht8ZHAEyEzsVJXrZ7LFmACQ6Wnkc3BoY2cTc9"))
-    for i in range(5):        
-        start_price, cost_with_fee = tracker.get_price_for_current_transaction()
+    
+    signature = Signature(base58.b58decode("QSpZYdjkdNqcRgtK8uxx9t5eyo186Sut57mA7p5yia565jGmYmwvVK5y8v4LZDyE4yYBR8AjFh6GUQYSVY9htAs"))
+    price, _, _, _ = tracker.get_current_price(signature)
 
-        if start_price:
-            time.sleep(30)
-            while True:
-                try:
-                    _, _, pnl_percentage = tracker.track_pnl(start_price, cost_with_fee)
-                    break
-                except Exception as e:
-                    cprint(f"Error while tracking PnL: {str(e)}", "red", attrs=["bold", "reverse"])
-                    time.sleep(5)
-        time.sleep(5)
-                    
+
+    while True: 
+
+        if price:
+            tracker.get_pnl(price, 2078.34, 0.00314428, 0.00203928) 
+            time.sleep(10)
 
 
 

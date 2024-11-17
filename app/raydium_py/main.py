@@ -32,9 +32,10 @@ class RaydiumSniper:
         self.tracker = None
         self.token_amount = 0
         self.bought_price:float = 0
-        self.sell_price:float = 0
-        self.txn_signature = None
-        self.price_with_fee = 0
+        self.buy_txn_signature = None
+        self.sell_txn_signature = None
+        self.bought_amount_with_fee = 0
+        self.swap_commision = 0
         self.pool_data = []
         self.df = pd.DataFrame(self.pool_data)   
 
@@ -58,16 +59,16 @@ class RaydiumSniper:
                 score = data['score']
                 cprint(f"Score: {score}", "yellow")
                 self.token_name = f"{data['tokenMeta']['name']} ({data['tokenMeta']['symbol']})"
-                cprint(data["tokenMeta"]["symbol"], "blue", attrs=["bold"])
-                cprint(data["tokenMeta"]["name"], "green", attrs=["bold"])
+                print(colored(data["tokenMeta"]["symbol"], "blue", attrs=["bold"]), end="  (")
+                print(colored(data["tokenMeta"]["name"], "green", attrs=["bold"]), ")")
                 for risk in data['risks']:
                     cprint(f"{risk['name']} - {risk['level']}", "cyan", "on_white", attrs=["bold"])
                     if risk["name"] == "Freeze Authority still enabled":
                         cprint("Tokens can be frozen and prevented from trading !!!","red", attrs=["bold", "reverse"])
                         return False
-                    # if risk["level"] == "danger":
-                    #     cprint(f"Risk level: {risk['level']}", "red", attrs=["bold", "reverse"])
-                    #     return False
+                    if risk["level"] == "danger":
+                        cprint(f"Risk level: {risk['level']}", "red", attrs=["bold", "reverse"])
+                        return False
                 return True
         except Exception as e:
             cprint(f"Error in check_if_rug: {str(e)}", "red", attrs=["bold", "reverse"])
@@ -82,34 +83,36 @@ class RaydiumSniper:
         cprint(f"Transaction URL: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
 
     async def sell(self):
-        confirm = False
-        while not confirm:
+        for attempt in range(3):
             confirm, txn_sgn = sell(str(self.pair_address))
+            if confirm:
+                return txn_sgn
             await asyncio.sleep(2)
-        return txn_sgn
+        return 0
         cprint(f"Transaction URL: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
 
     async def get_sell_price(self, txn_sgn):
-        while True:
-            try:
-                price_data = self.tracker.get_current_price(txn_sgn)
-                if price_data:
-                    sell_price, _, sell_price_with_fee = price_data                      
-                    return sell_price, sell_price_with_fee
-            except Exception as e:
-                cprint(f"Ошибка при получении цены продажи: {e}", "red", attrs=["bold", "reverse"])
-                time.sleep(10)
+        
+        try:
+            price_data = self.tracker.get_current_price(self.sell_txn_signature)
+            if price_data:
+                    price, token_amount, amount_with_fee, swap_commision = price_data
+                    return price
+        except Exception as e:
+            cprint(f"Ошибка при получении цены продажи: {e}", "red", attrs=["bold", "reverse"])
+        #         time.sleep(10)
+        # cprint(f"Не удалось получить цену продажи", "red", attrs=["bold", "reverse"])
 
     async def get_bought_price(self):
         while True:
             try:
-                price_data = self.tracker.get_current_price(self.txn_signature)
+                price_data = self.tracker.get_current_price(self.buy_txn_signature)
                 if price_data:
-                    self.bought_price, self.token_amount, self.price_with_fee = price_data                
-                    break
+                    price, token_amount, amount_with_fee, swap_commision = price_data
+                    return price
             except Exception as e:
-                cprint(f"Ошибка при получении цены: {e}", "red", attrs=["bold", "reverse"])
-                time.sleep(10)
+                cprint(f"Ошибка при получении цены покупки: {e}", "red", attrs=["bold", "reverse"])
+                time.sleep(4)
 
         
     async def track_pnl(self, take_profit, stop_loss):
@@ -119,7 +122,12 @@ class RaydiumSniper:
         while True:
             try:        
                 await asyncio.sleep(5)
-                _, _, pnl_percentage = self.tracker.get_pnl(self.bought_price)
+                pnl_percentage = self.tracker.get_pnl(
+                    self.bought_price,
+                    self.token_amount,
+                    self.bought_amount_with_fee,
+                    self.swap_commision
+                )
                 if pnl_percentage > take_profit:
                     print(colored(f"Take profit {pnl_percentage:.2f}% reached!!!", "green", attrs=["bold"]))
                     return
@@ -150,38 +158,49 @@ class RaydiumSniper:
                 if new_pool:
                     self.tracker = RaydiumPnLTracker(self.pair_address, self.mint, self.base)
                     await self.buy()
-                    if self.txn_signature:
-                        await self.get_bought_price()
+                    if self.buy_txn_signature:
+                        self.bought_price, self.token_amount, self.bought_amount_with_fee, self.swap_commision = await self.get_bought_price()
                     if self.bought_price:
-                        await self.track_pnl(50, -40)
-                    sell_txn = await self.sell()
-                    print(f"type of sell_txn: {type(sell_txn)}")
-                    if sell_txn:
-                        self.sell_price, sell_price_with_fee = await self.get_sell_price(sell_txn)
-                    print(f"sell price: {self.sell_price}, \nsell price with fee: {sell_price_with_fee}")
+                        await self.track_pnl(50, -300)
+                        await self.sell()
+
+                    # print(f"type of sell_txn: {type(sell_txn)}")
+                    if self.sell_txn_signature:
+                        sell_price = await self.get_sell_price(self.sell_txn_signature)
+                    print(f"sell price: {sell_price}")
+
+                    print(f"token_name: {self.token_name}")
+                    print(f"pair_address: {str(self.pair_address)}")
+                    print(f"base: {str(self.mint)}")
+                    print(f"mint: {str(self.base)}")
+                    print(f"link_to_pool: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}")
+                    print(f"link_to_buy_txn: https://explorer.solana.com/tx/{self.txn_signature}")
+                    print(f"buy_price (SOL): {self.bought_price}")
+                    print(f"buy_amount_with_fee (SOL): {self.price_with_fee}")
+                    print(f"link_to_sell_txn: https://explorer.solana.com/tx/{sell_txn}")
 
 
-            cprint("Saving swap data to CSV file...", "yellow")
+                # cprint("Saving swap data to CSV file...", "yellow")
 
-            self.pool_data.append[{
-                "token_name": self.token_name,
-                "pair_address": str(self.pair_address),
-                "base": str(self.mint),
-                "mint": str(self.base),
-                "link_to_pool": f"https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}",
-                "link_to_buy_txn": f"https://explorer.solana.com/tx/{self.txn_signature}",
-                "buy_price (SOL)": self.bought_price,
-                "buy_amount_with_fee (SOL)": self.price_with_fee,
-                "link_to_sell_txn": f"https://explorer.solana.com/tx/{sell_txn}",
-                "sell_price": self.sell_price,
-                # "sell_amount_with_fee (SOL)": sell_price_with_fee
-            }]
+                # self.pool_data.append[{
+                #     "token_name": self.token_name,
+                #     "pair_address": str(self.pair_address),
+                #     "base": str(self.mint),
+                #     "mint": str(self.base),
+                #     "link_to_pool": f"https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}",
+                #     "link_to_buy_txn": f"https://explorer.solana.com/tx/{self.txn_signature}",
+                #     "buy_price (SOL)": self.bought_price,
+                #     "buy_amount_with_fee (SOL)": self.price_with_fee,
+                #     "link_to_sell_txn": f"https://explorer.solana.com/tx/{sell_txn}",
+                #     "sell_price": self.sell_price,
+                #     # "sell_amount_with_fee (SOL)": sell_price_with_fee
+                # }]
 
-            filename = "app/swap_data.csv"
-            if not os.path.isfile(filename):
-                self.df.to_csv(filename, index=False)
-            else:
-                self.df.to_csv(filename, mode='a', header=False, index=False)
+                # filename = "app/swap_data.csv"
+                # if not os.path.isfile(filename):
+                #     self.df.to_csv(filename, index=False)
+                # else:
+                #     self.df.to_csv(filename, mode='a', header=False, index=False)
 
         # self.tracker = RaydiumPnLTracker(
         #     "2ZafAX1i8SpG1YE4mvQhqyVRYGijqHTnD6uPYZ9kaqbL",
@@ -204,7 +223,7 @@ if __name__ == "__main__":
 
 
 
-
+#############################################################################
  
 async def main():
     RaydiumLPV4 = Pubkey.from_string("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")
@@ -268,6 +287,8 @@ async def main():
 
 
     """
+
+    Пример rug check
     {'name': 'Mint Authority still enabled', 'value': '', 'description': 'More tokens can be minted by the owner', 'score': 50000, 'level': 'danger'}
 {'name': 'Freeze Authority still enabled', 'value': '', 'description': 'Tokens can be frozen and prevented from trading', 'score': 25000, 'level': 'danger'}
 {'name': 'Low Liquidity', 'value': '$0.00', 'description': 'Low amount of liquidity in the token pool', 'score': 6000, 'level': 'danger'}
