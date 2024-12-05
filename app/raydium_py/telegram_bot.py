@@ -88,9 +88,6 @@ class RaydiumTelegramBot:
     
     async def start_sniper(self, message: types.Message):
         if not self.is_sniper_active:
-            # Создаем новый экземпляр RaydiumSniper
-            self.sniper = RaydiumSniper(self.sol_in, self.slippage, self.priority_fee)
-            
             # Запускаем снайпер в отдельном потоке
             def run_sniper():
                 asyncio.run(self.sniper.run())
@@ -193,7 +190,10 @@ Token Amount: {self.sniper.token_amount}
         except Exception as e:
             await message.answer(f"Error calculating PnL: {str(e)}")
     
-    def start(self):        
+    def start(self):
+        # Создаем новый экземпляр RaydiumSniper
+        self.sniper = RaydiumSniper(self.sol_in, self.slippage, self.priority_fee)  
+
         # Run the Telegram bot
         asyncio.run(self.dp.start_polling(self.bot))
 

@@ -46,15 +46,17 @@ class RaydiumSniper:
                 data = await find_new_tokens(self.RaydiumLPV4)
                 if data:
                     self.mint, self.base, self.pair_address = data
-                    return True
+                    return data
             except Exception as e:
                 cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
                 await asyncio.sleep(retry_delay)
         return False
     
-    async def check_if_rug(self):
+    async def check_if_rug(self, mint_token=None):
         try:
-            r = requests.get(f"https://api.rugcheck.xyz/v1/tokens/{self.base}/report")
+            if not mint_token:
+                mint_token = self.base
+            r = requests.get(f"https://api.rugcheck.xyz/v1/tokens/{mint_token}/report")
             if r.status_code == 200:                
                 data = r.json()
                 score = data['score']
@@ -77,7 +79,7 @@ class RaydiumSniper:
             return False
     
     async def buy(self):
-        cprint(f"Transaction URL: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
+        # cprint(f"Transaction URL: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
         confirm = False
         for _ in range(2):
             self.buy_txn_signature, confirm = buy(str(self.pair_address), self.sol_in, self.slippage)
@@ -85,7 +87,7 @@ class RaydiumSniper:
                 return confirm
 
             await asyncio.sleep(4)
-        return confirm    
+        return False  
         
     async def sell(self):
         try:
