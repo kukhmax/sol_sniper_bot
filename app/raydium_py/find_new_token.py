@@ -160,7 +160,7 @@ async def get_tokens(signature: Signature, RaydiumLPV4: Pubkey) -> None:
             {'Token_Index': 'LP Pair', 'Account Public Key': tokens[2]}  # LP Pair
         ]
 
-        print()
+        print("\n\n")
         cprint("=============================================================", "white", "on_magenta", attrs=['bold'])
         cprint("===================== NEW POOL DETECTED =====================", "white", "on_magenta", attrs=['bold'])
         cprint("=============================================================", "white", "on_magenta", attrs=['bold'])

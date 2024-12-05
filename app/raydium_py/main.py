@@ -26,6 +26,7 @@ class RaydiumSniper:
         self.base = None
         self.pair_address = None
         self.token_name = None
+        self.token_symbol = None
         self.sol_in = sol_in
         self.slippage = slippage
         self.priority_fee = priority_fee
@@ -58,8 +59,9 @@ class RaydiumSniper:
                 data = r.json()
                 score = data['score']
                 cprint(f"Score: {score}", "yellow")
-                self.token_name = f"{data['tokenMeta']['name']} ({data['tokenMeta']['symbol']})"
-                print(colored(data["tokenMeta"]["symbol"], "blue", attrs=["bold"]), end="  (")
+                self.token_name = data['tokenMeta']['name']
+                self.token_symbol = data['tokenMeta']['symbol']
+                print(colored(data["tokenMeta"]["symbol"], "blue", attrs=["bold"]), end="  ( ")
                 print(colored(data["tokenMeta"]["name"], "green", attrs=["bold"]), ")")
                 for risk in data['risks']:
                     cprint(f"{risk['name']} - {risk['level']}", "cyan", "on_white", attrs=["bold"])
@@ -73,22 +75,28 @@ class RaydiumSniper:
         except Exception as e:
             cprint(f"Error in check_if_rug: {str(e)}", "red", attrs=["bold", "reverse"])
             return False
-
+    
     async def buy(self):
-        # await asyncio.sleep(5)
-        confirm = False
-        while not confirm:
-            self.txn_signature, confirm = buy(str(self.pair_address), SOL_IN, SLIPPAGE)
-            await asyncio.sleep(2)
         cprint(f"Transaction URL: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
-
-    async def sell(self):
-        for attempt in range(3):
-            confirm, txn_sgn = sell(str(self.pair_address))
+        confirm = False
+        for _ in range(2):
+            self.buy_txn_signature, confirm = buy(str(self.pair_address), self.sol_in, self.slippage)
             if confirm:
-                return txn_sgn
-            await asyncio.sleep(2)
-        return 0
+                return confirm
+
+            await asyncio.sleep(4)
+        return confirm    
+        
+    async def sell(self):
+        try:
+            for attempt in range(3):
+                confirm, self.sell_txn_signature = sell(str(self.pair_address))
+                if confirm:
+                    return self.sell_txn_signature
+                await asyncio.sleep(2)
+            return 0
+        except Exception as e:
+            cprint(f"Error in sell: {str(e)}", "red", attrs=["bold", "reverse"])
         cprint(f"Transaction URL: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
 
     async def get_sell_price(self, txn_sgn):
@@ -106,10 +114,9 @@ class RaydiumSniper:
     async def get_bought_price(self):
         while True:
             try:
-                price_data = self.tracker.get_current_price(self.buy_txn_signature)
-                if price_data:
-                    price, token_amount, amount_with_fee, swap_commision = price_data
-                    return price
+                self.bought_price, self.token_amount, self.bought_amount_with_fee, self.swap_commision = self.tracker.get_current_price(self.buy_txn_signature)
+                if self.bought_price:
+                    return
             except Exception as e:
                 cprint(f"Ошибка при получении цены покупки: {e}", "red", attrs=["bold", "reverse"])
                 time.sleep(4)
@@ -121,63 +128,71 @@ class RaydiumSniper:
         count_0 = 0
         while True:
             try:        
-                await asyncio.sleep(5)
+                
                 pnl_percentage = self.tracker.get_pnl(
                     self.bought_price,
                     self.token_amount,
-                    self.bought_amount_with_fee,
-                    self.swap_commision
+                    # self.bought_amount_with_fee,
+                    # self.swap_commision
                 )
                 if pnl_percentage > take_profit:
                     print(colored(f"Take profit {pnl_percentage:.2f}% reached!!!", "green", attrs=["bold"]))
                     return
                 if pnl_percentage < stop_loss:
                     print(colored(f"Stop loss {pnl_percentage:.2f}% reached!!!", "red", attrs=["bold"]))
-                    return
-                if pnl_percentage == 0:
-                    if count_0 == 5:
-                        print(colored(f"Price not changed for 5 minutes!!!", "red", attrs=["bold", "reverse"]))
+                    if count == 1:
                         return
-                    count_0 += 1
+                    count += 1
+                    continue
+                await asyncio.sleep(5)
+                # if pnl_percentage == 0:
+                #     if count_0 == 5:
+                #         print(colored(f"Price not changed for 5 minutes!!!", "red", attrs=["bold", "reverse"]))
+                #         return
+                #     count_0 += 1
             except Exception as e:
                     cprint(f"Error while tracking PnL: {str(e)}", "red", attrs=["bold", "reverse"])
                     if  "cannot access local variable 'pnl' where it is not associated with a value" in str(e):
                         return
-                    if count == 10:
-                        return
+                    # if count == 10:
+                    #     return
                     await asyncio.sleep(10)
-                    count += 1
+                    # count += 1
     
     async def run(self):
         
         while True:
             new_pool = await self.get_new_raydium_pool(5, 2)
+            cprint(f"Dexscreener URL with my txn: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
+            cprint(f"GMGN SCREENER URL : https://gmgn.ai/sol/token/{self.base}", "light_magenta")
             await asyncio.sleep(5)
             rugcheck = await self.check_if_rug()
             if rugcheck:
+            
                 if new_pool:
                     self.tracker = RaydiumPnLTracker(self.pair_address, self.mint, self.base)
-                    await self.buy()
-                    if self.buy_txn_signature:
-                        self.bought_price, self.token_amount, self.bought_amount_with_fee, self.swap_commision = await self.get_bought_price()
-                    if self.bought_price:
-                        await self.track_pnl(50, -300)
-                        await self.sell()
+                    confirm =  await self.buy()
+                    cprint(self.buy_txn_signature, "green", attrs=["bold"])
+                    if confirm:                        
+                        await self.get_bought_price()
+                        cprint(f"swap_commision: {self.swap_commision}", "green", attrs=["bold"])
+                        if self.bought_price:
+                            await self.track_pnl(50, -10)
+                            await self.sell()
 
-                    # print(f"type of sell_txn: {type(sell_txn)}")
-                    if self.sell_txn_signature:
-                        sell_price = await self.get_sell_price(self.sell_txn_signature)
-                    print(f"sell price: {sell_price}")
+                            if self.sell_txn_signature:
+                                sell_price = await self.get_sell_price(self.sell_txn_signature)
+                                print(f"sell price: {sell_price}")
 
-                    print(f"token_name: {self.token_name}")
-                    print(f"pair_address: {str(self.pair_address)}")
-                    print(f"base: {str(self.mint)}")
-                    print(f"mint: {str(self.base)}")
-                    print(f"link_to_pool: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}")
-                    print(f"link_to_buy_txn: https://explorer.solana.com/tx/{self.txn_signature}")
-                    print(f"buy_price (SOL): {self.bought_price}")
-                    print(f"buy_amount_with_fee (SOL): {self.price_with_fee}")
-                    print(f"link_to_sell_txn: https://explorer.solana.com/tx/{sell_txn}")
+                            print(f"token_name: {self.token_name}")
+                            print(f"pair_address: {str(self.pair_address)}")
+                            print(f"base: {str(self.mint)}")
+                            print(f"mint: {str(self.base)}")
+                            print(f"link_to_pool: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}")
+                            # print(f"link_to_buy_txn: https://explorer.solana.com/tx/{self.txn_signature}")
+                            print(f"buy_price (SOL): {self.bought_price}")
+                            print(f"buy_amount_with_fee (SOL): {self.bought_amount_with_fee}")
+                            # print(f"link_to_sell_txn: https://explorer.solana.com/tx/{sell_txn}")
 
 
                 # cprint("Saving swap data to CSV file...", "yellow")
@@ -214,8 +229,8 @@ class RaydiumSniper:
 
 
 if __name__ == "__main__":
-    SOL_IN = 0.001
-    SLIPPAGE = 10
+    SOL_IN = 0.03
+    SLIPPAGE = 20
     PRIORITY_FEE = 0.00005
     sniper = RaydiumSniper(SOL_IN, SLIPPAGE, PRIORITY_FEE)
     asyncio.run(sniper.run())

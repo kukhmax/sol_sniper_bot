@@ -21,14 +21,14 @@ from datetime import datetime
 
 
 # Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
-    handlers=[
-        logging.FileHandler('raydium_pnl.log'),
-        logging.StreamHandler()
-    ]
-)
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
+#     handlers=[
+#         logging.FileHandler('raydium_pnl.log'),
+#         logging.StreamHandler()
+#     ]
+# )
 
 class RaydiumPnLTracker:
     def __init__(self, pool_id, from_token, to_token, amount=0.001, rpc_url="https://api.mainnet-beta.solana.com"):
@@ -77,14 +77,10 @@ class RaydiumPnLTracker:
                     raw_transactions.write(transaction.to_json())
                     raw_transactions.write(",\n")
 
-                transaction_json = json.loads(transaction.to_json())
-                account_keys = list(transaction_json.get('transaction', {}).get('message').get('accountKeys'))
-                acc_keys = [key.get('pubkey') for key in account_keys]
-                if 'GkCpJYoX9WtWFVPiWieJfU2dsNw8oyJAnLSj3xnMeEtW' in acc_keys:
-                    comm_index = acc_keys.index('GkCpJYoX9WtWFVPiWieJfU2dsNw8oyJAnLSj3xnMeEtW')
-                    swap_commision = (post_balances[comm_index] - pre_balances[comm_index]) / 1000000000  # коммиссия в SOL за swap
-                else:
-                    swap_commision = 0
+                # transaction_json = json.loads(transaction.to_json())
+                # account_keys = list(transaction_json.get('transaction', {}).get('message').get('accountKeys'))
+
+                swap_commision = 0.00203928
 
                 pre_balances = transaction.meta.pre_balances
                 post_balances = transaction.meta.post_balances
@@ -92,8 +88,8 @@ class RaydiumPnLTracker:
                 
                 cost_of_swap_with_fee = (post_balances[0] - pre_balances[0]) / 1000000000  # стоимость swap в SOL c коммиссии
                 
-                print(f"Стоимость транзакции c коммиссией: {cost_of_swap_with_fee:.9f} SOL")
-                print(f"Коммиссия за swap: {swap_commision:.9f} SOL")
+                # print(f"Стоимость транзакции c коммиссией: {cost_of_swap_with_fee:.9f} SOL")
+                # print(f"Коммиссия за swap: {swap_commision:.9f} SOL")
 
                 
                 # cprint(f"Link to transaction in explorer : https://explorer.solana.com/tx/{tx_signature}", "magenta", "on_light_green")
@@ -141,8 +137,8 @@ class RaydiumPnLTracker:
                 except ZeroDivisionError:
                     price = 0
                 
-                print(colored(f"Current price: ", "magenta"), colored(f"{price:.14f} ", "yellow", attrs=["bold"]),
-                      colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
+                # print(colored(f"Current price: ", "magenta"), colored(f"{price:.14f} ", "yellow", attrs=["bold"]),
+                #       colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
 
                 return (
                     price, 
@@ -155,8 +151,9 @@ class RaydiumPnLTracker:
             
     def get_pnl(self, bought_price,
                 token_amount,
-                bought_amount_with_fee,
-                swap_commision):
+                # bought_amount_with_fee,
+                # swap_commision
+                ):
             try:
 
                 # amount_of_new_token = abs(cost_with_fee / bought_price)
@@ -166,16 +163,16 @@ class RaydiumPnLTracker:
                 print(colored(f"Real bought price: {bought_price:.10f}", "white", "on_blue", attrs=["bold"]), end="     ")
                 cprint(f"Real current price: {current_price:.10f}", "white", attrs=["bold"])
                 if current_price:
-                    zero_price = bought_amount_with_fee / token_amount  # Цена покупки с расчетом комиссии
-                    current_price_with_fee = ((current_price * token_amount) - swap_commision) / token_amount  # Цена последней транзакции с расчетом комиссии при продаже
+                    # zero_price = bought_amount_with_fee / token_amount  # Цена покупки с расчетом комиссии
+                    # current_price_with_fee = ((current_price * token_amount) - swap_commision) / token_amount  # Цена последней транзакции с расчетом комиссии при продаже
                     
-                    pnl = current_price_with_fee - zero_price
-                    pnl_percentage = ((pnl) / zero_price) * 100
+                    pnl = current_price - bought_price
+                    pnl_percentage = ((pnl) / bought_price) * 100
 
                     color_pnl = "on_green" if pnl_percentage >= 0 else "on_red"
-                    print(colored(f"     Bought price: {zero_price:.10f}", "white", attrs=["bold"]), 
-                          colored(f"Current price with fee: {current_price_with_fee:.10f}", "black", "on_white", attrs=["bold"]),
-                          colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
+                    # print(colored(f"     Bought price: {zero_price:.10f}", "white", attrs=["bold"]), 
+                    #       colored(f"Current price with fee: {current_price_with_fee:.10f}", "black", "on_white", attrs=["bold"]),
+                    #       colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
                     print(colored("PnL:   ", "yellow", attrs=["bold"]), end="")
                     print(colored(f" {pnl:.14f} ({pnl_percentage:.2f}%)", "white",color_pnl, attrs=["bold"]),
                           colored(f" Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "white", attrs=["bold"]))
@@ -186,46 +183,17 @@ class RaydiumPnLTracker:
 
 if __name__ == "__main__":
     print(f"Текущая дата и время: {datetime.now()}")
-    pool_id = Pubkey.from_string("91oH2wJ7xDRsx3GYYuswnzLvphWgM6LDBjBBrFNPmCx3")
+    pool_id = Pubkey.from_string("EH86TXQyJsbmaXxDPs6Sad1KBXCVrhn1GsqmugttG8MA")
     from_token = "So11111111111111111111111111111111111111112" 
-    to_token = "9t7DR2z3YFn89YbVeC3McanptdAhbNNwhJXCcCVnpump"
+    to_token = "EuE3AazX7VUAFz52XYkQG4dMCkqCeN4vLjuomCZ3pump"
     tracker = RaydiumPnLTracker(pool_id, from_token, to_token, 0.1)
     
-    signature = Signature(base58.b58decode("QSpZYdjkdNqcRgtK8uxx9t5eyo186Sut57mA7p5yia565jGmYmwvVK5y8v4LZDyE4yYBR8AjFh6GUQYSVY9htAs"))
+    signature = Signature(base58.b58decode("3KXYMVGH7i15gf3FS9XHX8nHWwCw51TfqR2F1bzG8awR4wFe64VB28h5TpDvu4U3B6iBFBnguDiY87upKdFLv1uD"))
     price, _, _, _ = tracker.get_current_price(signature)
 
 
     while True: 
 
         if price:
-            tracker.get_pnl(price, 2078.34, 0.00314428, 0.00203928) 
+            tracker.get_pnl(price, 26760) 
             time.sleep(10)
-
-
-
-                # message = transaction.transaction.message.account_keys
-                # account_keys = [str(key.pubkey) for key in message]
-
-
-                # # Создаем список словарей для данных
-                # data = []
-                # for i in range(len(account_keys)):
-                #     data.append({
-                #         "account_keys": account_keys[i],
-                #         "pre_balance": pre_balances[i],
-                #         "post_balance": post_balances[i]
-                #     })
-
-                # # Создаем DataFrame
-                # df = pd.DataFrame(data)
-
-                # # Добавляем колонку с изменением баланса
-                # df['balance_change'] = df['post_balance'] - df['pre_balance']
-                # df['balance_change_in_sol'] = df['balance_change'] / 1000000000
-
-                # # Печатаем DataFrame
-                # cost_of_swap_with_fee = df['balance_change_in_sol'][0]
-                # cprint(f"Стоимость транзакции c коммиссией: {cost_of_swap_with_fee:.9f} SOL", "light_yellow")
-
-                # # Сохраняем DataFrame в CSV
-                # # df.to_csv("transaction_balances.csv", index=False)
