@@ -34,7 +34,7 @@ class RaydiumTelegramBot:
         self.dp = Dispatcher()
         
         # Raydium Sniper configuration
-        self.sol_in = 0.033
+        self.sol_in = 0.02
         self.slippage = 10
         self.priority_fee = 0.00005
         
@@ -188,7 +188,7 @@ Screener URL: https://dexscreener.com/solana/{self.sniper.pair_address}
     async def check_solana_balance(self, message: types.Message):
         balance = await self.sniper.get_balance()
         # Placeholder for Solana balance check
-        await message.answer(f"💰 Solana Balance: {balance} SOL")
+        await message.answer(f"💰 Solana Balance: {balance} SOL 🟢💰")
     
     async def buy_token(self, message: types.Message):
         if not self.current_token:

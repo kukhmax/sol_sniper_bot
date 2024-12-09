@@ -5,6 +5,7 @@ import pandas as pd
 from solders.keypair import Keypair  #  type: ignore
 from solders.pubkey import Pubkey  # type: ignore
 from solders.signature import Signature  # type: ignore
+from solana.rpc.async_api import AsyncClient
 
 from termcolor import colored, cprint
 import asyncio
@@ -50,51 +51,30 @@ class RaydiumSniper:
     
     async def get_balance(self):
         try:
-            pubkey_str = str(self.payer_pubkey)
-            headers = {"accept": "application/json", "content-type": "application/json"}
-
-            payload = {
-                "id": 1,
-                "jsonrpc": "2.0",
-                "method": "getTokenAccountsByOwner",
-                "params": [
-                    pubkey_str,
-                    {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
-                    {"encoding": "jsonParsed", "commitment": "confirmed"}
-                ],
-            }
+            # Mainnet RPC endpoint (replace with your preferred endpoint)
+            rpc_url = "https://api.mainnet-beta.solana.com"
             
-            response = requests.post(MAIN_RPC, json=payload, headers=headers)
-            data = response.json()
-
-            tokens = []
-            for account in data.get('result', {}).get('value', []):
-                info = account['account']['data']['parsed']['info']
+            # Create an async Solana client
+            async with AsyncClient(rpc_url) as client:
+                # Get account info
+                account_info = await client.get_account_info(self.payer_pubkey )
                 
-                # Skip empty or zero balance accounts
-                if float(info['tokenAmount']['amount']) == 0:
-                    continue
+                # Check if account exists
+                if account_info.value is None:
+                    print(f"Account {self.payer_pubkey} does not exist.")
+                    return 0.0
                 
-                # r = requests.get(f"https://api.rugcheck.xyz/v1/tokens/{info['mint']}/report")
-                # cprint(f"Status code: {r.status_code} - {r.reason}", "yellow")
-                # if r.status_code == 200:                
-                #     data = r.json()
-                #     token_name = data['tokenMeta']['name']
-                #     token_symbol = data['tokenMeta']['symbol']
-
-                token_details = {
-                    'mint': info['mint'],
-                    # 'name': f"{token_symbol} ({token_name})",
-                    'amount': float(info['tokenAmount']['amount']) / (10 ** info['tokenAmount']['decimals']),
-                }
-                tokens.append(token_details)
-
-
-
-            cprint(tokens)
+                # Get balance in lamports (1 SOL = 10^9 lamports)
+                balance_lamports = account_info.value.lamports
+                
+                # Convert lamports to SOL
+                balance_sol = balance_lamports / 10**9
+                
+                return balance_sol
+        
         except Exception as e:
-            return None
-    
+            print(f"Error fetching balance: {e}")
+            return 0.0
 
     async def get_new_raydium_pool(self, max_retries, retry_delay):
         for attempt in range(max_retries):
@@ -109,42 +89,44 @@ class RaydiumSniper:
         return False
     
     async def check_if_rug(self, mint_token=None):
-        try:
-            if not mint_token:
-                mint_token = self.mint
-            r = requests.get(f"https://api.rugcheck.xyz/v1/tokens/{self.mint}/report")
-            cprint(f"Status code: {r.status_code} - {r.reason}", "yellow")
-            if r.status_code == 200:                
-                data = r.json()
-                score = data['score']
-                cprint(f"Score: {score}", "yellow")
-                self.token_name = data['tokenMeta']['name']
-                self.token_symbol = data['tokenMeta']['symbol']
-                print(colored(data["tokenMeta"]["symbol"], "blue", attrs=["bold"]), end="  ( ")
-                print(colored(data["tokenMeta"]["name"], "green", attrs=["bold"]), ")")
+        for _ in range(2):
+            try:
+                if not mint_token:
+                    mint_token = self.mint
+                r = requests.get(f"https://api.rugcheck.xyz/v1/tokens/{self.mint}/report")
+                cprint(f"Status code: {r.status_code} - {r.reason}", "yellow")
+                if r.status_code == 200:                
+                    data = r.json()
+                    score = data['score']
+                    cprint(f"Score: {score}", "yellow")
+                    self.token_name = data['tokenMeta']['name']
+                    self.token_symbol = data['tokenMeta']['symbol']
+                    print(colored(data["tokenMeta"]["symbol"], "blue", attrs=["bold"]), end="  ( ")
+                    print(colored(data["tokenMeta"]["name"], "green", attrs=["bold"]), ")")
 
-                await self.global_bot.send_message(f"""
-New token found: {data['tokenMeta']['symbol']} ({data['tokenMeta']['name']})
-Score: {score}
-                                                   """)
-                for risk in data['risks']:
-                    cprint(f"{risk['name']} - {risk['level']}", "cyan", "on_white", attrs=["bold"])
-                    if_danger = "🛑" if risk['level'] == "danger" else "✅"
-                    await self.global_bot.send_message(f"{if_danger} {risk['name']} - {risk['level']}")
-                    if risk["name"] == "Freeze Authority still enabled":
-                        playsound('app/raydium_py/signals/extra_special.mp3')
-                        cprint("Tokens can be frozen and prevented from trading !!!","red", attrs=["bold", "reverse"])
-                        return False
-                    if risk["level"] == "danger":
-                        playsound('app/raydium_py/signals/extra_special.mp3')
-                        cprint(f"Risk level: {risk['level']}", "red", attrs=["bold", "reverse"])
-                        return False
-                return True
-        except Exception as e:
-            cprint(f"Error in check_if_rug: {str(e)}", "red", attrs=["bold", "reverse"])
-            return False
+                    await self.global_bot.send_message(f"""
+    New token found: {data['tokenMeta']['symbol']} ({data['tokenMeta']['name']})
+    Score: {score}
+                                                    """)
+                    for risk in data['risks']:
+                        cprint(f"{risk['name']} - {risk['level']}", "cyan", "on_white", attrs=["bold"])
+                        if_danger = "🛑" if risk['level'] == "danger" else "✅"
+                        await self.global_bot.send_message(f"{if_danger} {risk['name']} - {risk['level']}")
+                        if risk["name"] == "Freeze Authority still enabled":
+                            playsound('app/raydium_py/signals/extra_special.mp3')
+                            cprint("Tokens can be frozen and prevented from trading !!!","red", attrs=["bold", "reverse"])
+                            return False
+                        if risk["level"] == "danger":
+                            playsound('app/raydium_py/signals/extra_special.mp3')
+                            cprint(f"Risk level: {risk['level']}", "red", attrs=["bold", "reverse"])
+                            return False
+                    return True
+                await asyncio.sleep(40)
+            except Exception as e:
+                cprint(f"Error in check_if_rug: {str(e)}", "red", attrs=["bold", "reverse"])
+                return False
     
-    async def buy(self):
+    async def buy(self, pair_ad):
         # cprint(f"Transaction URL: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
         confirm = False
         for _ in range(4):
@@ -216,14 +198,14 @@ Token Amount: {self.token_amount} {self.token_symbol}
                 if pnl_percentage > take_profit:
                     playsound('app/raydium_py/signals/wow.mp3')
                     print(colored(f"Take profit {pnl_percentage:.2f}% reached!!!", "green", attrs=["bold"]))
-                    return
-                # if pnl_percentage < stop_loss:
-                #     print(colored(f"Stop loss {pnl_percentage:.2f}% reached!!!", "red", attrs=["bold"]))
-                #     if count == 1:
-                #         playsound('app/raydium_py/signals/cry.mp3')
-                #         return
-                #     count += 1
-                #     continue
+                    return 80
+                if pnl_percentage < stop_loss:
+                    print(colored(f"Stop loss {pnl_percentage:.2f}% reached!!!", "red", attrs=["bold"]))
+                    if count == 1:
+                        playsound('app/raydium_py/signals/cry.mp3')
+                        return 100
+                    count += 1
+                    continue
                 
                 # if pnl_percentage == 0:
                 #     if count_0 == 5:
@@ -247,7 +229,7 @@ Token Amount: {self.token_amount} {self.token_symbol}
             playsound('app/raydium_py/signals/combat_warning.mp3')
             cprint(f"Dexscreener URL with my txn: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
             cprint(f"GMGN SCREENER URL : https://gmgn.ai/sol/token/{self.mint}", "light_magenta")
-            await asyncio.sleep(8)
+            await asyncio.sleep(7)
 
             rugcheck = await self.check_if_rug()            
 
@@ -271,38 +253,39 @@ GMGN URL: https://gmgn.ai/sol/token/{self.mint}
                     await self.get_bought_price()
                     if self.bought_price:
                         buy_info = f"""       
-💹 Token Bought Successfully:
-Buy Price: {self.bought_price:.10f} SOL
-Token Amount: {self.token_amount} {self.token_symbol}
+    💹 Token Bought Successfully:
+    Buy Price: {self.bought_price:.10f} SOL
+    Token Amount: {self.token_amount} {self.token_symbol}
                         """
                         await self.global_bot.send_message(buy_info)
 
-                        await self.track_pnl(50, -10)
-                        
+                        percent = await self.track_pnl(50, -10)
+                    
+                        sell_confirm = await self.sell(percent)
+
                         while True:
                             token_balance = get_token_balance(str(self.mint))
                             cprint(f"token balance: {token_balance}", "green", attrs=["bold"])
                             if not token_balance:
                                 break
-                            await asyncio.sleep(5)
-                        # sell_confirm = await self.sell()
+                            await asyncio.sleep(15)
 
-                        # if sell_confirm:                            
-                        #     await asyncio.sleep(2)
-                        #     sell_data = await self.get_sell_price(self.sell_txn_signature)
-                        #     print(f"sell price: {sell_data[0]}")
+                        if sell_confirm:                            
+                            await asyncio.sleep(2)
+                            sell_data = await self.get_sell_price(self.sell_txn_signature)
+                            print(f"sell price: {sell_data[0]}")
 
                         #     #TODO : если продажа на 100% прошла , self.token_amount = 0 или проверить amount
 
-                        #     print(f"token_name: {self.token_name}")
-                        #     print(f"pair_address: {str(self.pair_address)}")
-                        #     print(f"base: {str(self.mint)}")
-                        #     print(f"mint: {str(self.base)}")
-                        #     print(f"link_to_pool: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}")
-                        #     # print(f"link_to_buy_txn: https://explorer.solana.com/tx/{self.txn_signature}")
-                        #     print(f"buy_price (SOL): {self.bought_price:.10f}")
-                        #     print(f"buy_amount_with_fee (SOL): {self.bought_amount_with_fee}")
-                        #     print(f"link_to_sell_txn: https://explorer.solana.com/tx/{self.sell_txn_signature}")
+                            print(f"token_name: {self.token_name}")
+                            print(f"pair_address: {str(self.pair_address)}")
+                            print(f"base: {str(self.mint)}")
+                            print(f"mint: {str(self.base)}")
+                            print(f"link_to_pool: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}")
+                            # print(f"link_to_buy_txn: https://explorer.solana.com/tx/{self.txn_signature}")
+                            print(f"buy_price (SOL): {self.bought_price:.10f}")
+                            print(f"buy_amount_with_fee (SOL): {self.bought_amount_with_fee}")
+                            print(f"link_to_sell_txn: https://explorer.solana.com/tx/{self.sell_txn_signature}")
 
 
                 # cprint("Saving swap data to CSV file...", "yellow")
