@@ -272,4 +272,4 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
     
     except Exception as e:
         cprint(f"Error occurred during transaction: {str(e)}", "red", attrs=["bold", "reverse"])
-        return False
+        return False, None

@@ -150,7 +150,7 @@ class RaydiumPnLTracker:
             cprint("Request timed out, retrying...", "yellow")
             
     def get_pnl(self, bought_price,
-                token_amount,
+                token_amount=0,
                 # bought_amount_with_fee,
                 # swap_commision
                 ):
