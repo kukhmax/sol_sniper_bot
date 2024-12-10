@@ -95,3 +95,7 @@ Swap API is used live on:
 https://www.solanatracker.io
 
 *Add your site here*
+
+ Solana Early Trending 💵 has ID -1002093384030
+
+ Test bot has ID 7475229862
