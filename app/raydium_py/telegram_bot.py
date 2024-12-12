@@ -13,6 +13,11 @@ from global_bot import GlobalBot
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from main import RaydiumSniper
 
+from dotenv import load_dotenv
+
+# Загрузка переменных окружения
+load_dotenv()
+
 # Configure logging
 def setup_logging():
     # Настройка логирования
@@ -34,7 +39,7 @@ class RaydiumTelegramBot:
         self.dp = Dispatcher()
         
         # Raydium Sniper configuration
-        self.sol_in = 0.02
+        self.sol_in = 0.015
         self.slippage = 10
         self.priority_fee = 0.00005
         
@@ -270,7 +275,7 @@ Token Amount: {self.sniper.token_amount}
 
 # Usage
 if __name__ == "__main__":
-    # BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    BOT_TOKEN = "7475229862:AAHaXp3lcOwp6WDUvlwYQH9vI7RcvDHrxdk"
+    BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+    # BOT_TOKEN = "7475229862:AAHaXp3lcOwp6WDUvlwYQH9vI7RcvDHrxdk"
     raydium_bot = RaydiumTelegramBot(BOT_TOKEN)
     raydium_bot.start()

@@ -2,7 +2,9 @@ import os
 import asyncio
 import json
 import logging
+import requests
 from datetime import datetime
+from termcolor import colored, cprint
 from telethon import TelegramClient, events
 
 from dotenv import load_dotenv
@@ -24,7 +26,7 @@ API_HASH = os.getenv('API_HASH')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 SOURCE_CHANNEL = os.getenv('SOURCE_CHANNEL', '@solearlytrending')
 TARGET_CHAT_ID = os.getenv('TARGET_CHAT_ID', '199222002')
-PHONE_NUMBER = ""
+PHONE_NUMBER = "+48884098177"
 
 # ID чатов
 SOURCE_CHAT_ID = -1002093384030
@@ -50,6 +52,8 @@ def parse_message(message):
         'forward_from': message.forward.from_id if message.forward else None,
         'forward_date': message.forward.date.isoformat() if message.forward and message.forward.date else None
     }
+
+    # print(parsed_message['text'])
 
     # Если есть медиафайл, добавляем информацию о нем
     if message.media:
@@ -77,6 +81,31 @@ async def save_message_to_json(message):
     except Exception as e:
         print(f"Ошибка сохранения сообщения: {e}")
 
+async def rugcheck(mint):
+    try:
+        r = requests.get(f"https://api.rugcheck.xyz/v1/tokens/{mint}/report")
+        if r.status_code == 200:                
+            data = r.json()
+            pair_address  = data["markets"][0]["pubkey"]
+            symbol = data["tokenMeta"]["symbol"]
+            score = data['score']
+            risk_descriptions = []
+            is_no_danger = True
+
+            if data["risks"]:
+                for risk in data["risks"]:
+                    risk_descriptions.append(f"{risk['description']} ({risk['level']})")
+                    if risk["level"] == "danger":
+                        logger.warning(colored(f"Risk is high because {risk['description']}"))
+                        is_no_danger = False
+                        break
+            return pair_address, symbol, score, risk_descriptions, is_no_danger
+        logger.warning(colored(f"Status code: {r.status_code} - {r.reason}", "magenta", attrs=["bold"]))
+        return None
+    except Exception as e:
+        logger.error(colored(f"Error rugchecking: {str(e)}"))
+        return None
+
 async def main():
     # Создаем клиент Telegram
     client = TelegramClient('session', API_ID, API_HASH)
@@ -84,13 +113,42 @@ async def main():
     # Обработчик новых сообщений
     @client.on(events.NewMessage(chats=SOURCE_CHAT_ID))
     async def forward_and_save_messages(event):
+        print(f"Сообщение: {event.message.id}")
         try:
-            # Пересылаем сообщение в целевой чат
-            await client.send_message(TARGET_CHAT_ID, event.message)
-            print(f"Сообщение переслано: {event.message.id}")
-            
+            if "New" in event.message.text:
+                mint = event.message.text.split("New")[0].split('**](https://t.me/soul_sniper_bot?start=15_')[1].replace(')**', '').strip()
+                # print(mint)
+
+                token_name = event.message.text.split("New")[0].split('**](https://t.me/soul_sniper_bot?start=15_')[0].replace('🔥 [**', '').strip()
+                print(token_name, '    ', mint)
+
+                print(f"GMGN URL: https://gmgn.ai/sol/token/{mint}")
+                print(f"RugCheck: https://api.rugcheck.xyz/v1/tokens/{mint}/report")
+
+
+                # extract data from rugcheck.xyz
+                rug_check = await rugcheck(mint)
+                if rug_check:
+                    pair_address, symbol, score, risk_descriptions, is_no_danger = rug_check
+                    if  is_no_danger:
+
+                        message  = f"""
+🔥  **{symbol}**    [{token_name}](https://t.me/solearlytrending/{event.message.id})
+
+📊  __Score__:   [{score}]({f"https://api.rugcheck.xyz/v1/tokens/{mint}/report"})
+⚖️  __Risks__:   {'\n        '.join(risk_descriptions)}
+
+📈  **DexScreener**    [link](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc)
+📈  **GMGN**              [link](https://gmgn.ai/sol/token/{mint})
+                        """
+                        # Пересылаем сообщение в целевой чат
+                        await client.send_message(TARGET_CHAT_ID, message)
+                        print(f"Сообщение переслано: {event.message.id}")
+                        
+                        
+
             # Сохраняем сообщение в JSON
-            await save_message_to_json(event.message)
+            # await save_message_to_json(event.message)
             
         except Exception as e:
             print(f"Ошибка при обработке сообщения: {e}")
@@ -105,3 +163,13 @@ async def main():
 # Запускаем основную функцию
 if __name__ == '__main__':
     asyncio.run(main())
+
+
+
+#  # You can, of course, use markdown in your messages:
+#     message = await client.send_message(
+#         'me',
+#         'This message has **bold**, `code`, __italics__ and '
+#         'a [nice website](https://example.com)!',
+#         link_preview=False
+#     )

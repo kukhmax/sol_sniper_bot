@@ -170,8 +170,8 @@ async def get_tokens(signature: Signature, RaydiumLPV4: Pubkey) -> None:
         for row in data:
             cprint("│".join(f" {str(row[col]).ljust(15)} " for col in header), "green", attrs=["bold"])
         print()
-        cprint(f"Link to raydium pool: https://api.raydium.io/v2/ammV3/ammPool/{tokens[2]}", "blue", attrs=["bold"])
-        cprint(f"Link to DEXScreener: https://dexscreener.com/solana/{tokens[2]}", "red", "on_yellow")
+        # cprint(f"Link to raydium pool: https://api.raydium.io/v2/ammV3/ammPool/{tokens[2]}", "blue", attrs=["bold"])
+        # cprint(f"Link to DEXScreener: https://dexscreener.com/solana/{tokens[2]}", "red", "on_yellow")
         # cprint(f"Link to Solscan: https://solscan.io/tx/{signature}", "red", "on_white", attrs=['bold'])
         
 

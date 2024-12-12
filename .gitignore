@@ -134,3 +134,7 @@ htmlcov/
 exemples/
 *.json
 *.exemples/
+
+*.session
+session.session-journal
+session.session

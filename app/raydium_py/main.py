@@ -24,7 +24,7 @@ from playsound import playsound
 
 
 class RaydiumSniper:
-    def __init__(self, sol_in, slippage, priority_fee, global_bot):
+    def __init__(self, sol_in=0.01, slippage=10, priority_fee=0, global_bot=None):
         # Добавляем необязательный параметр global_bot
         self.global_bot = global_bot or GlobalBot.get_instance()
 
@@ -82,7 +82,7 @@ class RaydiumSniper:
                 data = await find_new_tokens(self.RaydiumLPV4)
                 if data:                    
                     self.base, self.mint, self.pair_address = data
-                    return data
+                    return True
             except Exception as e:
                 cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
                 await asyncio.sleep(retry_delay)
@@ -126,11 +126,13 @@ class RaydiumSniper:
                 cprint(f"Error in check_if_rug: {str(e)}", "red", attrs=["bold", "reverse"])
                 return False
     
-    async def buy(self, pair_ad):
+    async def buy(self, pair_address=None):
+        if not pair_address:
+            pair_address = self.pair_address
         # cprint(f"Transaction URL: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
         confirm = False
         for _ in range(4):
-            self.buy_txn_signature, confirm = buy(str(self.pair_address), self.sol_in, self.slippage)
+            self.buy_txn_signature, confirm = buy(str(pair_address), self.sol_in, self.slippage)
             if confirm:
                 return confirm
 
@@ -183,10 +185,10 @@ Token Amount: {self.token_amount} {self.token_symbol}
     async def track_pnl(self, take_profit, stop_loss):
         cprint("tracking PnL...", "green", attrs=["bold"])
         count = 0
-        count_0 = 0
+        current_pnl = 30
         while True:
             try:        
-                await asyncio.sleep(5)
+                await asyncio.sleep(1)
                 pnl_percentage = self.tracker.get_pnl(
                     self.bought_price,
                     self.token_amount,
@@ -195,17 +197,26 @@ Token Amount: {self.token_amount} {self.token_symbol}
                 )
                 if pnl_percentage < -90:
                     continue
+                if pnl_percentage > current_pnl + 10:
+                    cprint(f"Price changed by {pnl_percentage - current_pnl:.2f}%!!", "green", attrs=["bold"])
+                    current_pnl = pnl_percentage
+
+                if pnl_percentage < current_pnl - 50: 
+                    cprint(f"Price changed by {pnl_percentage - current_pnl:.2f}%!!", "red", attrs=["bold"])
+                    current_pnl = pnl_percentage
+
+                
                 if pnl_percentage > take_profit:
                     playsound('app/raydium_py/signals/wow.mp3')
                     print(colored(f"Take profit {pnl_percentage:.2f}% reached!!!", "green", attrs=["bold"]))
-                    return 80
-                if pnl_percentage < stop_loss:
-                    print(colored(f"Stop loss {pnl_percentage:.2f}% reached!!!", "red", attrs=["bold"]))
-                    if count == 1:
-                        playsound('app/raydium_py/signals/cry.mp3')
-                        return 100
-                    count += 1
-                    continue
+                    return 65
+                # if pnl_percentage < stop_loss:
+                #     print(colored(f"Stop loss {pnl_percentage:.2f}% reached!!!", "red", attrs=["bold"]))
+                #     if count == 1:
+                #         playsound('app/raydium_py/signals/cry.mp3')
+                #         return 100
+                #     count += 1
+                #     continue
                 
                 # if pnl_percentage == 0:
                 #     if count_0 == 5:
@@ -233,7 +244,7 @@ Token Amount: {self.token_amount} {self.token_symbol}
 
             rugcheck = await self.check_if_rug()            
 
-            if rugcheck and new_pool:
+            if rugcheck:
                 playsound('app/raydium_py/signals/76a24c7c8089950.mp3')
 
                 token_info = f"""
@@ -245,84 +256,59 @@ GMGN URL: https://gmgn.ai/sol/token/{self.mint}
 
                 await self.global_bot.send_message(token_info)
 
-                self.tracker = RaydiumPnLTracker(self.pair_address, self.base, self.mint)
-                await asyncio.sleep(2)
-                confirm =  await self.buy()
-                if confirm:
-                    playsound('app/raydium_py/signals/buy.mp3')                      
-                    await self.get_bought_price()
-                    if self.bought_price:
-                        buy_info = f"""       
-    💹 Token Bought Successfully:
-    Buy Price: {self.bought_price:.10f} SOL
-    Token Amount: {self.token_amount} {self.token_symbol}
-                        """
-                        await self.global_bot.send_message(buy_info)
+                if new_pool:
 
-                        percent = await self.track_pnl(50, -10)
-                    
-                        sell_confirm = await self.sell(percent)
+                    self.tracker = RaydiumPnLTracker(self.pair_address, self.base, self.mint)
+                    await asyncio.sleep(2)
+                    confirm =  await self.buy()
+                    if confirm:
+                        playsound('app/raydium_py/signals/buy.mp3')                      
+                        await self.get_bought_price()
+                        if self.bought_price:
+                            buy_info = f"""       
+        💹 Token Bought Successfully:
+        Buy Price: {self.bought_price:.10f} SOL
+        Token Amount: {self.token_amount} {self.token_symbol}
+                            """
+                            await self.global_bot.send_message(buy_info)
 
-                        while True:
+                            percent = await self.track_pnl(100, -10)
+                        
+                            sell_confirm = await self.sell(percent)
                             token_balance = get_token_balance(str(self.mint))
-                            cprint(f"token balance: {token_balance}", "green", attrs=["bold"])
-                            if not token_balance:
-                                break
-                            await asyncio.sleep(15)
 
-                        if sell_confirm:                            
-                            await asyncio.sleep(2)
-                            sell_data = await self.get_sell_price(self.sell_txn_signature)
-                            print(f"sell price: {sell_data[0]}")
+                            while True:
+                                new_token_balance = get_token_balance(str(self.mint))
+                                if new_token_balance > 0 and new_token_balance != token_balance:
+                                    cprint(f"token balance: {token_balance}", "green", attrs=["bold"])
+                                    token_balance = new_token_balance
+                                await self.track_pnl(500, -10)
+                                if not token_balance:
+                                    break
+                                await asyncio.sleep(1)
 
-                        #     #TODO : если продажа на 100% прошла , self.token_amount = 0 или проверить amount
+                            if sell_confirm:                            
+                                await asyncio.sleep(2)
+                                sell_data = await self.get_sell_price(self.sell_txn_signature)
+                                print(f"sell price: {sell_data[0]}")
 
-                            print(f"token_name: {self.token_name}")
-                            print(f"pair_address: {str(self.pair_address)}")
-                            print(f"base: {str(self.mint)}")
-                            print(f"mint: {str(self.base)}")
-                            print(f"link_to_pool: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}")
-                            # print(f"link_to_buy_txn: https://explorer.solana.com/tx/{self.txn_signature}")
-                            print(f"buy_price (SOL): {self.bought_price:.10f}")
-                            print(f"buy_amount_with_fee (SOL): {self.bought_amount_with_fee}")
-                            print(f"link_to_sell_txn: https://explorer.solana.com/tx/{self.sell_txn_signature}")
+                                #TODO : если продажа на 100% прошла , self.token_amount = 0 или проверить amount
+
+                                print(f"token_name: {self.token_name}")
+                                print(f"pair_address: {str(self.pair_address)}")
+                                print(f"base: {str(self.mint)}")
+                                print(f"mint: {str(self.base)}")
+                                print(f"link_to_pool: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}")
+                                # print(f"link_to_buy_txn: https://explorer.solana.com/tx/{self.txn_signature}")
+                                print(f"buy_price (SOL): {self.bought_price:.10f}")
+                                print(f"buy_amount_with_fee (SOL): {self.bought_amount_with_fee}")
+                                print(f"link_to_sell_txn: https://explorer.solana.com/tx/{self.sell_txn_signature}")
 
 
-                # cprint("Saving swap data to CSV file...", "yellow")
-
-                # self.pool_data.append[{
-                #     "token_name": self.token_name,
-                #     "pair_address": str(self.pair_address),
-                #     "base": str(self.mint),
-                #     "mint": str(self.base),
-                #     "link_to_pool": f"https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}",
-                #     "link_to_buy_txn": f"https://explorer.solana.com/tx/{self.txn_signature}",
-                #     "buy_price (SOL)": self.bought_price,
-                #     "buy_amount_with_fee (SOL)": self.price_with_fee,
-                #     "link_to_sell_txn": f"https://explorer.solana.com/tx/{sell_txn}",
-                #     "sell_price": self.sell_price,
-                #     # "sell_amount_with_fee (SOL)": sell_price_with_fee
-                # }]
-
-                # filename = "app/swap_data.csv"
-                # if not os.path.isfile(filename):
-                #     self.df.to_csv(filename, index=False)
-                # else:
-                #     self.df.to_csv(filename, mode='a', header=False, index=False)
-
-        # self.tracker = RaydiumPnLTracker(
-        #     "2ZafAX1i8SpG1YE4mvQhqyVRYGijqHTnD6uPYZ9kaqbL",
-        #     "Fk2wnisZ4AjWtUfep1NXPjWbEFqUvWDnhXxGcGfopump", 
-        #     "So11111111111111111111111111111111111111112", 
-        #     )
-        # data =await self.get_sell_price(Signature(base58.b58decode("3vaHBbV1mLb943kwJQkVwDGxU7yJYBgPaKQrScdbM44X7jiPWcAuZ3yFXdMvaC6YDZNJAwqE9DjHy1Ek1i6z9uVw")))
-        # for i in data:
-        #     print(type(i))
-        #     print(f"{i:.15f}")
-
+              
 
 if __name__ == "__main__":
-    SOL_IN = 0.03
+    SOL_IN = 0.02
     SLIPPAGE = 20
     PRIORITY_FEE = 0.00005
     sniper = RaydiumSniper(SOL_IN, SLIPPAGE, PRIORITY_FEE, None)
