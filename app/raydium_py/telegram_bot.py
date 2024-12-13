@@ -11,23 +11,13 @@ from global_bot import GlobalBot
 
 # Import the RaydiumSniper class from main.py
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from main import RaydiumSniper
+from sniper_bot import RaydiumSniper
 
-from dotenv import load_dotenv
-
-# Загрузка переменных окружения
-load_dotenv()
-
-# Configure logging
-def setup_logging():
-    # Настройка логирования
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
-        handlers=[
-            logging.FileHandler("telegram_bot.log"),
-            logging.StreamHandler()
-        ]
+logging.basicConfig(
+    filename='telegam_bot.log',
+    filemode='a',
+    level=logging.DEBUG, 
+    format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
     )
 
 
@@ -39,7 +29,7 @@ class RaydiumTelegramBot:
         self.dp = Dispatcher()
         
         # Raydium Sniper configuration
-        self.sol_in = 0.015
+        self.sol_in = 0.08
         self.slippage = 10
         self.priority_fee = 0.00005
         
@@ -192,6 +182,7 @@ Screener URL: https://dexscreener.com/solana/{self.sniper.pair_address}
     
     async def check_solana_balance(self, message: types.Message):
         balance = await self.sniper.get_balance()
+        logging.info(f"Solana balance: {balance}")
         # Placeholder for Solana balance check
         await message.answer(f"💰 Solana Balance: {balance} SOL 🟢💰")
     
@@ -275,7 +266,7 @@ Token Amount: {self.sniper.token_amount}
 
 # Usage
 if __name__ == "__main__":
-    BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    # BOT_TOKEN = "7475229862:AAHaXp3lcOwp6WDUvlwYQH9vI7RcvDHrxdk"
+    # BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+    BOT_TOKEN = "7475229862:AAHaXp3lcOwp6WDUvlwYQH9vI7RcvDHrxdk"
     raydium_bot = RaydiumTelegramBot(BOT_TOKEN)
     raydium_bot.start()

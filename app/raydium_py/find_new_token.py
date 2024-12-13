@@ -31,7 +31,7 @@ log_instruction = "init_pc_amount"
 # log_instruction = "initialize2"
 
 logging.basicConfig(
-    filename='app.log',
+    filename='telegram_bot.log',
     filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
@@ -76,7 +76,7 @@ async def process_messages(
         value = msg[0].result.value
 
         if not idx % 20000:
-            cprint(f"Received {idx} messages", "white")
+            cprint(f"Received {idx} messages", "light_cyan")
 
         for log in value.logs:
             if instruction not in log:
@@ -136,10 +136,10 @@ async def get_tokens(signature: Signature, RaydiumLPV4: Pubkey) -> None:
         encoding="jsonParsed",
         max_supported_transaction_version=0
     )
-    with open("transactions.json", 'a', encoding='utf-8') as raw_transactions:
-        raw_transactions.write(f"'signature': {signature},\n")
-        raw_transactions.write(transaction.to_json())
-        raw_transactions.write("\n\n")
+    # with open("transactions.json", 'a', encoding='utf-8') as raw_transactions:
+    #     raw_transactions.write(f"'signature': {signature},\n")
+    #     raw_transactions.write(transaction.to_json())
+    #     raw_transactions.write("\n\n")
     
     instructions = transaction.value.transaction.transaction.message.instructions
 
@@ -160,16 +160,17 @@ async def get_tokens(signature: Signature, RaydiumLPV4: Pubkey) -> None:
             {'Token_Index': 'LP Pair', 'Account Public Key': tokens[2]}  # LP Pair
         ]
 
-        print("\n\n")
+        print()
         cprint("=============================================================", "white", "on_magenta", attrs=['bold'])
         cprint("===================== NEW POOL DETECTED =====================", "white", "on_magenta", attrs=['bold'])
         cprint("=============================================================", "white", "on_magenta", attrs=['bold'])
-        header = ["Token_Index", "Account Public Key"]
         print()
-        cprint("│".join(f" {col.ljust(15)} " for col in header), "green", attrs=["bold"])
-        for row in data:
-            cprint("│".join(f" {str(row[col]).ljust(15)} " for col in header), "green", attrs=["bold"])
-        print()
+        # header = ["Token_Index", "Account Public Key"]
+        # print()
+        # cprint("│".join(f" {col.ljust(15)} " for col in header), "green", attrs=["bold"])
+        # for row in data:
+        #     cprint("│".join(f" {str(row[col]).ljust(15)} " for col in header), "green", attrs=["bold"])
+        # print()
         # cprint(f"Link to raydium pool: https://api.raydium.io/v2/ammV3/ammPool/{tokens[2]}", "blue", attrs=["bold"])
         # cprint(f"Link to DEXScreener: https://dexscreener.com/solana/{tokens[2]}", "red", "on_yellow")
         # cprint(f"Link to Solscan: https://solscan.io/tx/{signature}", "red", "on_white", attrs=['bold'])
@@ -191,6 +192,16 @@ async def get_tokens(signature: Signature, RaydiumLPV4: Pubkey) -> None:
         })
         # Save data to CSV after each transaction
         save_to_csv(pool_data)
+
+        logging.info("\n======= find new LP !!! =======\n")
+        logging.info(f"""
+        Token_base: {base}
+        Token_mint: {mint}, \n Pair: {tokens[2]}
+        Link to raydium pool: https://api.raydium.io/v2/ammV3/ammPool/{tokens[2]}
+        Link to DEXScreener: https://dexscreener.com/solana/{tokens[2]}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc
+        Link to Solscan: https://solscan.io/tx/{signature}
+        Link to RugCheck: https://api.rugcheck.xyz/v1/tokens/{mint}/report
+        """)
 
         return str(base), str(mint), tokens[2]
 

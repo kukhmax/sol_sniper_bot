@@ -3,6 +3,7 @@ import time
 from typing import Optional, Union
 
 import requests
+import logging
 
 from solana.rpc.commitment import Processed
 from solana.transaction import AccountMeta, Signature
@@ -12,7 +13,7 @@ from solders.pubkey import Pubkey  # type: ignore
 
 from termcolor import colored, cprint
 
-from config import RPC, client, payer_keypair
+from config import RPC,MAIN_RPC, client, payer_keypair
 from constants import (
     OPEN_BOOK_PROGRAM, 
     RAY_AUTHORITY_V4, 
@@ -26,6 +27,12 @@ from layouts import (
     SWAP_LAYOUT
 )
 
+logging.basicConfig(
+    filename='telegam_bot.log',
+    filemode='a',
+    level=logging.DEBUG, 
+    format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
+    )
 
 def make_swap_instruction(amount_in:int, minimum_amount_out:int, token_account_in:Pubkey, token_account_out:Pubkey, accounts:dict, owner:Keypair) -> Instruction:
     try:
@@ -58,7 +65,8 @@ def make_swap_instruction(amount_in:int, minimum_amount_out:int, token_account_i
             )
         )
         return Instruction(RAY_V4, data, keys)
-    except:
+    except Exception as e:
+        logging.error(f"Swap instruction error: {str(e)}")
         return None
 
 def fetch_pool_keys(pair_address: str) -> dict:
@@ -92,7 +100,8 @@ def fetch_pool_keys(pair_address: str) -> dict:
         
         return pool_keys
     except Exception as e:
-        cprint(f"Error fetching pool keys: {e}", "red", attrs=["bold", "reverse"])
+        cprint(f"Error fetching pool keys in utils.py module: {e}", "red", attrs=["bold", "reverse"])
+        logging.error(f"Error fetching pool keys: {str(e)}")
         return None
     
 def find_data(data: Union[dict, list], field: str) -> Optional[str]:
@@ -127,10 +136,12 @@ def get_token_balance(mint_str: str):
             ],
         }
         
-        response = requests.post(RPC, json=payload, headers=headers)
+        response = requests.post(MAIN_RPC, json=payload, headers=headers)
         ui_amount = find_data(response.json(), "uiAmount")
         return float(ui_amount)
     except Exception as e:
+        cprint(f"Error fetching token balance in utils.py module: {e}", "red", attrs=["bold", "reverse"])
+        logging.error(f"Error fetching token balance: {str(e)}")
         return None
     
 def confirm_txn(txn_sig: Signature, max_retries: int = 20, retry_interval: int = 3) -> bool:
@@ -142,19 +153,24 @@ def confirm_txn(txn_sig: Signature, max_retries: int = 20, retry_interval: int =
             txn_json = json.loads(txn_res.value.transaction.meta.to_json())
             
             if txn_json['err'] is None:
-                print("Transaction confirmed... try count:", retries)
+                cprint(f"Transaction confirmed... try count: {retries}", "light_cyan", attrs=["dark"])
+                logging.debug(f"Transaction confirmed... try count: {retries}")
                 return True
             
-            print("Error: Transaction not confirmed. Retrying...")
+            cprint("Error: Transaction not confirmed. Retrying...", "magenta", attrs=["bold", "reverse"])
+            logging.error("Transaction not confirmed. Retrying...")
             if txn_json['err']:
-                print("Transaction failed.")
+                cprint("Transaction failed!!!", "red", attrs=["bold", "reverse"])
+                logging.error("Transaction failed!!!")
                 return False
         except Exception as e:
-            print("Awaiting confirmation... try count:", retries)
+            cprint(f"Awaiting confirmation... try count: {retries}. Error: {str(e)}", "light_blue", attrs=["dark"])
+            logging.error(f"Awaiting confirmation... try count: {retries}. Error: {str(e)}")
             retries += 1
             time.sleep(retry_interval)
     
-    print("Max retries reached. Transaction confirmation failed.")
+    cprint("Max retries reached. Transaction confirmation failed.", "red", attrs=["bold", "reverse"])
+    logging.error("Max retries reached. Transaction confirmation failed.")
     return None
 
 def get_pair_address(mint):
@@ -165,7 +181,8 @@ def get_pair_address(mint):
         pair_address = response.json()['data']['data'][0]['id']
         return pair_address
     except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
+        cprint(f"An error occurred: {e}", "red", attrs=["bold", "reverse"])
+        logging.error(f"An error occurred: {str(e)}")
         return None
 
 def get_token_price(pool_keys: dict) -> tuple:
@@ -207,5 +224,6 @@ def get_token_price(pool_keys: dict) -> tuple:
         return token_price, token_decimal
 
     except Exception as e:
-        print(f"Error occurred: {e}")
+        cprint(f"Error occurred: {e}", "red", attrs=["bold", "reverse"])
+        logging.error(f"Error occurred: {str(e)}")
         return None, None
