@@ -109,7 +109,7 @@ def get_tokens_info(
     token0 = accounts[8]
     token1 = accounts[9]
     # Start logging
-    logging.info("======= find LP !!! =======")
+    logging.info("\n\n======= find LP !!! =======\n\n")
     logging.info(f"\n Token0: {token0}, \n Token1: {token1}, \n Pair: {pair}")
     return token0, token1, pair
 
@@ -231,16 +231,16 @@ async def find_new_tokens(RaydiumLPV4: Pubkey = RaydiumLPV4):
                     return token0, token1, pool
                 except (AttributeError, SolanaRpcException) as err:
                      # Omitting httpx.HTTPStatusError: Client error '429 Too Many Requests'
-                    logging.exception(err)
-                    logging.info("sleep for 5 seconds and try again")
-                    cprint(f"========= Danger! Danger! ==========\n{err}\nSleep for 5 seconds and try again", "red", attrs=["reverse", "blink"])
+                    # logging.exception(err)
+                    logging.info(f"{str(err)}\nsleep for 5 seconds and try again")
+                    cprint(f"{err}\nSleep for 5 seconds and try again", "red", attrs=["reverse", "blink"])
                     sleep(4)
                     continue
 
         except (ProtocolError, ConnectionClosedError) as err:
             # Restart socket connection if ProtocolError: invalid status code
-            logging.exception(err)
-            cprint(f"Danger! Danger!\n{err}", "red", attrs=["reverse", "blink"])
+            logging.error(f"{str(err)}")
+            # cprint(f"{err}", "red", attrs=["reverse", "blink"])
             continue
         except KeyboardInterrupt:
             if websocket:

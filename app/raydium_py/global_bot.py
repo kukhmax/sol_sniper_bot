@@ -27,6 +27,6 @@ class GlobalBot:
 
         try:
             logging.info(f"Отправка сообщения: {message}")
-            await self.bot.send_message(self.chat_id, message)
+            await self.bot.send_message(self.chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
         except Exception as e:
             logging.error(f"Ошибка при отправке сообщения: {e}")

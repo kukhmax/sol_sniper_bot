@@ -1,3 +1,5 @@
+"""https://docs.telethon.dev/en/stable/basic/quick-start.html"""
+
 import os
 import asyncio
 import json

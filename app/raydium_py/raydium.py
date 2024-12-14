@@ -4,7 +4,9 @@ import os
 from solana.rpc.commitment import Processed
 from solana.rpc.types import TokenAccountOpts, TxOpts
 
-from solders.compute_budget import set_compute_unit_limit, set_compute_unit_price  # type: ignore
+from solders.compute_budget import (  # type: ignore
+    set_compute_unit_limit, set_compute_unit_price 
+)  
 from solders.message import MessageV0  # type: ignore
 from solders.pubkey import Pubkey  # type: ignore
 from solders.system_program import (
@@ -158,22 +160,41 @@ def buy(pair_address: str, sol_in: float = .01, slippage: int = 5) -> bool:
             txn = VersionedTransaction(compiled_message, [payer_keypair]), 
             opts = TxOpts(skip_preflight=True)
             ).value
-        
+
         logging.info(f"Transaction Signature: {txn_sig}")
 
         cprint("Confirming transaction...", "white", attrs=["bold"])
         logging.info("Confirming transaction...")
         confirmed = confirm_txn(txn_sig)
-        logging.info(colored(f"Transaction confirmed: {confirmed}", "white", "on_light_green", attrs=["bold"]))
-        # cprint(f"Link to transaction in explorer : https://explorer.solana.com/tx/{txn_sig}", "magenta", "on_white")
-        
+        logging.info(f"Transaction confirmed: {confirmed}")
+
         return (txn_sig, confirmed)
 
     except Exception as e:
-        logging.error(colored(f"Error occurred during transaction: {str(e)}", "red", attrs=["bold", "reverse"]))
+        logging.error(f"Error occurred during transaction: {str(e)}")
         return (None, False)
 
 def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
+    """
+    Executes a sell transaction for a specified percentage of tokens in a given trading pair.
+
+    Args:
+        pair_address (str): The address of the trading pair to sell tokens on.
+        percentage (int, optional): The percentage of the token balance to sell. Must be between 1 and 100. Defaults to 100.
+        slippage (int, optional): The allowable slippage percentage for the transaction. Defaults to 5.
+
+    Returns:
+        bool: True if the transaction is successful and confirmed, False otherwise.
+
+    The function performs the following steps:
+    - Validates the percentage to ensure it's within the acceptable range.
+    - Fetches the pool keys for the specified pair address.
+    - Retrieves the token balance and calculates the amounts for the transaction based on the current token price and slippage.
+    - Generates swap instructions and manages token accounts, including WSOL account creation and closure.
+    - Sends the transaction and confirms its success.
+    - Handles errors by logging them and returning False if the transaction fails.
+    """
+
     try:
         cprint(f"Starting sell transaction for pair address: {pair_address}", "yellow", "on_blue", attrs=["bold"])
         logging.info(f"Starting sell transaction for pair address: {pair_address}")
@@ -197,7 +218,7 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
         cprint("Retrieving token balance...", "blue", attrs=["bold"])
         logging.info("Retrieving token balance...")
         token_balance = get_token_balance(str(mint))
-        cprint("Token Balance: {token_balance}", "light_yellow", attrs=["bold"])
+        cprint(f"Token Balance: {token_balance}", "light_yellow", attrs=["bold"])
         logging.info(f"Token Balance: {token_balance}")
         if token_balance == 0:
             cprint("No token balance available to sell.", "red", attrs=["bold", "reverse"])
@@ -272,7 +293,7 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
             )
             instructions.append(close_token_account_instr)
 
-        logging.info(colored("Compiling transaction message...", "green", attrs=["bold"]))
+        logging.info("Compiling transaction message...")
         compiled_message = MessageV0.try_compile(
             payer_keypair.pubkey(),
             instructions,
@@ -294,10 +315,7 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
         logging.info("Confirming transaction...")
         confirmed = confirm_txn(txn_sig)
         cprint(f"Transaction confirmed: {confirmed}", "white", "on_light_green", attrs=["bold"])
-        logging.info(colored(f"Transaction confirmed: {confirmed}", "white", "on_light_green", attrs=["bold"]))
-
-        # cprint(f"Link to transaction in explorer : https://explorer.solana.com/tx/{txn_sig}", "magenta", "on_white")
-        
+        logging.info(f"Transaction confirmed: {confirmed}")
         return confirmed, txn_sig
     
     except Exception as e:

@@ -20,15 +20,12 @@ from termcolor import colored, cprint
 from datetime import datetime
 
 
-# Настройка логирования
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
-#     handlers=[
-#         logging.FileHandler('raydium_pnl.log'),
-#         logging.StreamHandler()
-#     ]
-# )
+logging.basicConfig(
+    filename='telegam_bot.log',
+    filemode='a',
+    level=logging.DEBUG, 
+    format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
+    )
 
 class RaydiumPnLTracker:
     def __init__(self, pool_id, from_token, to_token, amount=0.001, rpc_url="https://api.mainnet-beta.solana.com"):
@@ -39,7 +36,7 @@ class RaydiumPnLTracker:
         self.amount = amount
 
     def get_price_for_current_transaction(self):
-        # try:
+        try:
             # Получаем список подписей транзакций для этого пула
             signatures_response = self.client.get_signatures_for_address(self.pool_id)
 
@@ -51,7 +48,9 @@ class RaydiumPnLTracker:
                 price, bought_tokens_amount, cost_of_swap_with_fee, swap_commision = self.get_current_price(latest_signature)
                 return price
             
-        # except Exception as e:
+        except Exception as e:
+            logging.error(f"Error while getting current transaction: {str(e)}")
+
         #     cprint(f"Error while getting current transaction: {str(e)}", "red", attrs=["bold", "reverse"])
 
     def  get_current_price(self,signature):
@@ -125,13 +124,13 @@ class RaydiumPnLTracker:
                                     elif pre_mint == new_token:
                                         diffs[new_token] = abs(diff)
                 except Exception as e:
-                    cprint(f"Error while getting diffs: {str(e)}", "red", attrs=["bold", "reverse"])
-                # print()
-                # cprint(diffs, "magenta", attrs=["bold"])
+                    # cprint(f"Error while getting diffs: {str(e)}", "red", attrs=["bold", "reverse"])
+                    logging.error(f"Error while getting diffs: {str(e)}")
+
                 bought_tokens_amount = diffs[new_token]
-                cprint(f"Amount of new token: {bought_tokens_amount:.8f} tokens ", "magenta", attrs=["bold"])
+                # cprint(f"Amount of new token: {bought_tokens_amount:.8f} tokens ", "magenta", attrs=["bold"])
                 
-                print()
+                # print()
                 try:     
                     price = diffs[sol] / diffs[new_token]
                 except ZeroDivisionError:
@@ -149,19 +148,15 @@ class RaydiumPnLTracker:
         except requests.exceptions.Timeout:
             cprint("Request timed out, retrying...", "yellow")
             
-    def get_pnl(self, bought_price,
-                token_amount=0,
-                # bought_amount_with_fee,
-                # swap_commision
-                ):
+    def get_pnl(self, bought_price):
             try:
 
                 # amount_of_new_token = abs(cost_with_fee / bought_price)
                 # cprint(f"Amount of new token with fee: +{amount_of_new_token:.4f} tokens ", "white", attrs=["bold"])
 
                 current_price = self.get_price_for_current_transaction()
-                print(colored(f"Real bought price: {bought_price:.10f}", "white", "on_blue", attrs=["bold"]), end="     ")
-                cprint(f"Real current price: {current_price:.10f}", "white", attrs=["bold"])
+                # print(colored(f"Real bought price: {bought_price:.10f}", "white", "on_blue", attrs=["bold"]), end="     ")
+                # cprint(f"Real current price: {current_price:.10f}", "white", attrs=["bold"])
                 if current_price:
                     # zero_price = bought_amount_with_fee / token_amount  # Цена покупки с расчетом комиссии
                     # current_price_with_fee = ((current_price * token_amount) - swap_commision) / token_amount  # Цена последней транзакции с расчетом комиссии при продаже
@@ -169,16 +164,17 @@ class RaydiumPnLTracker:
                     pnl = current_price - bought_price
                     pnl_percentage = ((pnl) / bought_price) * 100
 
-                    color_pnl = "on_green" if pnl_percentage >= 0 else "on_red"
+                    # color_pnl = "on_green" if pnl_percentage >= 0 else "on_red"
                     # print(colored(f"     Bought price: {zero_price:.10f}", "white", attrs=["bold"]), 
                     #       colored(f"Current price with fee: {current_price_with_fee:.10f}", "black", "on_white", attrs=["bold"]),
                     #       colored(f"  Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "cyan", attrs=["bold"]))
-                    print(colored("PnL:   ", "yellow", attrs=["bold"]), end="")
-                    print(colored(f" {pnl:.14f} ({pnl_percentage:.2f}%)", "white",color_pnl, attrs=["bold"]),
-                          colored(f" Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "white", attrs=["bold"]))
+                    # print(colored("PnL:   ", "yellow", attrs=["bold"]), end="")
+                    # print(colored(f" {pnl:.14f} ({pnl_percentage:.2f}%)", "white",color_pnl, attrs=["bold"]),
+                    #       colored(f" Time: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", "white", attrs=["bold"]))
                 return pnl_percentage
             except Exception as e:
-                cprint(f"Error while getting PnL: {str(e)}", "red", attrs=["bold", "reverse"])
+            #     cprint(f"Error while getting PnL: {str(e)}", "red", attrs=["bold", "reverse"])
+                return None
 
 
 if __name__ == "__main__":

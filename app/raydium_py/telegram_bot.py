@@ -1,3 +1,5 @@
+"""https://github.com/kukhmax/sol_sniper_bot/tree/main"""
+
 import os
 import asyncio
 import logging
@@ -29,7 +31,7 @@ class RaydiumTelegramBot:
         self.dp = Dispatcher()
         
         # Raydium Sniper configuration
-        self.sol_in = 0.08
+        self.sol_in = 0.007
         self.slippage = 10
         self.priority_fee = 0.00005
         
@@ -227,15 +229,15 @@ Token Amount: {self.sniper.token_amount}
         except Exception as e:
             await message.answer(f"Error selling token: {str(e)}")
     
-    async def track_pnl(self):
-        try:
-            await self.sniper.track_pnl(take_profit=100, stop_loss=-10)
-        except Exception as e:
-            logging.error(f"PnL tracking error: {str(e)}")
+    # async def track_pnl(self):
+    #     try:
+    #         await self.sniper.track_pnl(take_profit=100, stop_loss=-10)
+    #     except Exception as e:
+    #         logging.error(f"PnL tracking error: {str(e)}")
     
     async def show_current_pnl(self, message: types.Message):
         self.bought_price = self.sniper.bought_price
-        cprint(f"self.bought_price = {self.bought_price}")
+        # cprint(f"self.bought_price = {self.bought_price}", "white", attrs=["bold"])
         if not self.bought_price:
             await message.answer("No active trade to show PnL")
             return
@@ -243,7 +245,7 @@ Token Amount: {self.sniper.token_amount}
         try:
             pnl_percentage = self.sniper.tracker.get_pnl(
                 self.sniper.bought_price,
-                self.sniper.token_amount
+                # self.sniper.token_amount
             )
             pnl_message = f"📊 Current PnL: {pnl_percentage:.2f}%"
             await message.answer(pnl_message)
