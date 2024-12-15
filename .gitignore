@@ -138,3 +138,4 @@ exemples/
 *.session
 session.session-journal
 session.session
+*.tar

@@ -29,13 +29,13 @@ from spl.token.instructions import (
 from termcolor import colored, cprint
 import logging
 
-from config import client, payer_keypair, UNIT_BUDGET, UNIT_PRICE
-from constants import SOL_DECIMAL, SOL, TOKEN_PROGRAM_ID, WSOL
-from layouts import ACCOUNT_LAYOUT
-from utils import confirm_txn, fetch_pool_keys, get_token_price, make_swap_instruction, get_token_balance
+from app.config import client, payer_keypair, UNIT_BUDGET, UNIT_PRICE
+from app.constants import SOL_DECIMAL, SOL, TOKEN_PROGRAM_ID, WSOL
+from app.layouts import ACCOUNT_LAYOUT
+from app.utils import confirm_txn, fetch_pool_keys, get_token_price, make_swap_instruction, get_token_balance
 
 logging.basicConfig(
-    filename='telegam_bot.log',
+    filename='logs/telegam_bot.log',
     filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",

@@ -4,8 +4,8 @@ from termcolor import colored, cprint
 from playsound import playsound
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from global_bot import GlobalBot
-from track_pnl import RaydiumPnLTracker
+from app.global_bot import GlobalBot
+from app.track_pnl import RaydiumPnLTracker
 
 class TokenTradingManager:
     def __init__(self, sniper, global_bot=None):

@@ -3,25 +3,25 @@
 import os
 import asyncio
 import logging
+import dotenv
+
+from termcolor import cprint
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-import sys
-import threading
-from termcolor import colored, cprint
-from global_bot import GlobalBot
 
-# Import the RaydiumSniper class from main.py
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from sniper_bot import RaydiumSniper
+from app.global_bot import GlobalBot
+from app.sniper_bot import RaydiumSniper
+
+
+dotenv.load_dotenv()
 
 logging.basicConfig(
-    filename='telegam_bot.log',
+    filename='logs/telegam_bot.log',
     filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
     )
-
 
 class RaydiumTelegramBot:
     def __init__(self, bot_token):
@@ -31,7 +31,7 @@ class RaydiumTelegramBot:
         self.dp = Dispatcher()
         
         # Raydium Sniper configuration
-        self.sol_in = 0.007
+        self.sol_in = 0.005
         self.slippage = 10
         self.priority_fee = 0.00005
         
@@ -268,7 +268,6 @@ Token Amount: {self.sniper.token_amount}
 
 # Usage
 if __name__ == "__main__":
-    # BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    BOT_TOKEN = "7475229862:AAHaXp3lcOwp6WDUvlwYQH9vI7RcvDHrxdk"
+    BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
     raydium_bot = RaydiumTelegramBot(BOT_TOKEN)
     raydium_bot.start()

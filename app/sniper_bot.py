@@ -1,5 +1,3 @@
-import os
-import base58
 import requests
 import pandas as pd
 import logging
@@ -14,23 +12,22 @@ import time
 import json
 from datetime import datetime
 
-from find_new_token import find_new_tokens
-from track_pnl import RaydiumPnLTracker
-from raydium import sell, buy
-from config import payer_keypair, MAIN_RPC
-from global_bot import GlobalBot
-from utils import get_token_balance, find_data
+from app.find_new_token import find_new_tokens
+from app.track_pnl import RaydiumPnLTracker
+from app.raydium import sell, buy
+from app.config import payer_keypair, MAIN_RPC
+from app.global_bot import GlobalBot
+from app.utils import get_token_balance, find_data
 
-from playsound import playsound
+# from playsound import playsound
 
 
 logging.basicConfig(
-    filename='telegam_bot.log',
+    filename='logs/telegam_bot.log',
     filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
     )
-
 
 class RaydiumSniper:
     def __init__(self, sol_in, slippage, priority_fee, global_bot=None):
@@ -138,14 +135,14 @@ class RaydiumSniper:
                         if_danger = "🛑" if risk['level'] == "danger" else "✅"
                         await self.global_bot.send_message(f"{if_danger} {risk['name']} - {risk['level']}")
                         if risk["name"] == "Freeze Authority still enabled":
-                            playsound('app/raydium_py/signals/extra_special.mp3')
+                            # playsound('app/raydium_py/signals/extra_special.mp3')
                             cprint("Tokens can be frozen and prevented from trading !!!","red", attrs=["bold", "reverse"])
                             return False
                         # if risk["name"] == "Copycat token":
                         #     cprint("Copycat token !!!","red", attrs=["bold", "reverse"])
                         #     return False
                         if risk["level"] == "danger":
-                            playsound('app/raydium_py/signals/extra_special.mp3')
+                            # playsound('app/raydium_py/signals/extra_special.mp3')
                             cprint(f"Risk level: {risk['level']}", "red", attrs=["bold", "reverse"])
                             return False
                     return True
@@ -177,7 +174,7 @@ class RaydiumSniper:
             for attempt in range(3):
                 confirm, self.sell_txn_signature = sell(str(self.pair_address), percentage)
                 if confirm:
-                    playsound('app/raydium_py/signals/sell.mp3')
+                    # playsound('app/raydium_py/signals/sell.mp3')
                     self.token_amount = get_token_balance(str(self.mint))
                     
                     await self.global_bot.send_message(f"""
@@ -221,12 +218,12 @@ Token Amount: {self.token_amount} {self.token_symbol}
                 logging.error(f"Ошибка при получении цены покупки: {str(e)}")
                 # cprint(f"Ошибка при получении цены покупки: {e}", "red", attrs=["bold", "reverse"])
                 time.sleep(3)
-
-        
+      
     async def track_pnl_and_sell(self, first_tp, second_tp, sp=None):
         cprint("tracking PnL...", "green", attrs=["bold"])
         logging.info("\nTracking PnL...")
         last_pnl = 0
+        err_amount = 0
         while self.is_tracking_pnl:
             try:        
                 await asyncio.sleep(4)
@@ -239,6 +236,10 @@ Token Amount: {self.token_amount} {self.token_symbol}
                 logging.info(f"Token amount: {self.token_amount}")
 
                 if self.token_amount is None or self.token_amount < 1:
+                    if err_amount < 3:
+                        err_amount += 1
+                        continue
+
                     cprint("Token amount {self.token_amount} is less than 1 or not exists!!!", "red", attrs=["bold", "reverse"])
                     self.is_tracking_pnl = False
                     return True
@@ -288,7 +289,7 @@ Token Amount: {self.token_amount} {self.token_symbol}
         while True:     
 
             new_pool = await self.get_new_raydium_pool(5, 2)
-            playsound('app/raydium_py/signals/combat_warning.mp3')
+            # playsound('app/raydium_py/signals/combat_warning.mp3')
             cprint(f"Dexscreener URL with my txn: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
             cprint(f"GMGN SCREENER URL : https://gmgn.ai/sol/token/{self.mint}", "light_magenta")
             await asyncio.sleep(7)
@@ -296,7 +297,7 @@ Token Amount: {self.token_amount} {self.token_symbol}
             rugcheck = await self.check_if_rug()            
 
             if rugcheck and new_pool:
-                playsound('app/raydium_py/signals/76a24c7c8089950.mp3')
+                # playsound('app/raydium_py/signals/76a24c7c8089950.mp3')
                 
 
                 token_info = f"""
@@ -318,7 +319,7 @@ Token Amount: {self.token_amount} {self.token_symbol}
                     await self.global_bot.send_message(f"❌ {not_confirmed} ❌")
                     cprint(not_confirmed, "magenta", attrs=["bold", "reverse"])
                 elif confirm:
-                    playsound('app/raydium_py/signals/buy.mp3')                      
+                    # playsound('app/raydium_py/signals/buy.mp3')                      
                     await self.get_bought_price()
                     if self.bought_price:
                         buy_info = f"""       

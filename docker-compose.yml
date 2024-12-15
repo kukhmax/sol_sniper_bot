@@ -1,0 +1,11 @@
+version: '3.13'
+
+services:
+  telegram-bot:
+    image: telegram-bot:latest  # Замените на ваш образ Docker
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: python telegram_bot.py  # Команда запуска приложения
+    volumes:
+      - ./logs:/app/logs  # Пример монтирования директорий для логов

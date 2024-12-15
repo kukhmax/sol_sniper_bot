@@ -31,7 +31,7 @@ log_instruction = "init_pc_amount"
 # log_instruction = "initialize2"
 
 logging.basicConfig(
-    filename='telegram_bot.log',
+    filename='logs/telegram_bot.log',
     filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",

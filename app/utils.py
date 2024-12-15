@@ -13,22 +13,22 @@ from solders.pubkey import Pubkey  # type: ignore
 
 from termcolor import cprint
 
-from config import MAIN_RPC, client, payer_keypair
-from constants import (
+from app.config import MAIN_RPC, client, payer_keypair
+from app.constants import (
     OPEN_BOOK_PROGRAM,
     RAY_AUTHORITY_V4,
     RAY_V4,
     TOKEN_PROGRAM_ID,
     SOL
 )
-from layouts import (
+from app.layouts import (
     LIQUIDITY_STATE_LAYOUT_V4,
     MARKET_STATE_LAYOUT_V3,
     SWAP_LAYOUT
 )
 
 logging.basicConfig(
-    filename='telegam_bot.log',
+    filename='logs/telegam_bot.log',
     filemode='a',
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",

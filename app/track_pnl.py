@@ -1,8 +1,6 @@
-import json
+
 import base58
-import base64
-import asyncio
-import aiohttp
+
 import logging
 import time
 import requests
@@ -21,7 +19,7 @@ from datetime import datetime
 
 
 logging.basicConfig(
-    filename='telegam_bot.log',
+    filename='logs/telegam_bot.log',
     filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",

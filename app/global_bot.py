@@ -1,5 +1,5 @@
 import logging
-import asyncio
+
 
 class GlobalBot:
     _instance = None
