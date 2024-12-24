@@ -1,0 +1,8 @@
+services:
+  telegram-bot:
+    image: bot:latest
+    container_name: bot
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: python scrap_bot.py

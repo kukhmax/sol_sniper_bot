@@ -9,8 +9,11 @@ RUN apt-get update && apt-get install -y \
     libasound2-dev \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /app/logs
+
+
 # Устанавливаем рабочую директорию
-WORKDIR /
+WORKDIR /app
 
 # Копируем все файлы в контейнер
 COPY . .
@@ -23,7 +26,7 @@ RUN pip install --upgrade pip setuptools wheel \
 ENV PYTHONUNBUFFERED=1
 
 # Устанавливаем права на выполнение скрипта
-RUN chmod +x telegram_bot.py
+RUN chmod +x scrap_bot.py
 
 # Запускаем бота
-CMD ["python", "telegram_bot.py"]
+CMD ["python", "scrap_bot.py"]

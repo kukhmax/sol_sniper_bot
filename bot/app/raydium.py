@@ -6,7 +6,7 @@ from solana.rpc.types import TokenAccountOpts, TxOpts
 
 from solders.compute_budget import (  # type: ignore
     set_compute_unit_limit, set_compute_unit_price 
-)  
+)
 from solders.message import MessageV0  # type: ignore
 from solders.pubkey import Pubkey  # type: ignore
 from solders.system_program import (
@@ -35,8 +35,8 @@ from app.layouts import ACCOUNT_LAYOUT
 from app.utils import confirm_txn, fetch_pool_keys, get_token_price, make_swap_instruction, get_token_balance
 
 logging.basicConfig(
-    filename='logs/telegam_bot.log',
-    filemode='a',
+#    filename='logs/telegam_bot.log',
+#    filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
     )
@@ -103,7 +103,7 @@ def buy(pair_address: str, sol_in: float = .01, slippage: int = 5) -> bool:
                 owner=TOKEN_PROGRAM_ID
             )
         )
-        
+
         init_wsol_account_instr = initialize_account(
             InitializeAccountParams(
                 program_id=TOKEN_PROGRAM_ID,
@@ -112,7 +112,7 @@ def buy(pair_address: str, sol_in: float = .01, slippage: int = 5) -> bool:
                 owner=payer_keypair.pubkey()
             )
         )
-        
+
         cprint("Funding WSOL account...", "yellow", attrs=["bold"])
         logging.info("Funding WSOL account...")
         fund_wsol_account_instr = transfer(
@@ -316,9 +316,9 @@ def sell(pair_address: str, percentage: int = 100, slippage: int = 5) -> bool:
         confirmed = confirm_txn(txn_sig)
         cprint(f"Transaction confirmed: {confirmed}", "white", "on_light_green", attrs=["bold"])
         logging.info(f"Transaction confirmed: {confirmed}")
-        return confirmed, txn_sig
-    
+        return confirmed, txn_sig, token_balance
+
     except Exception as e:
         cprint(f"Error occurred during transaction: {str(e)}", "red", attrs=["bold", "reverse"])
         logging.error(f"Error occurred during transaction: {str(e)}")
-        return False, None
+        return False, None, None

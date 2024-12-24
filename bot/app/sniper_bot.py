@@ -17,14 +17,14 @@ from app.track_pnl import RaydiumPnLTracker
 from app.raydium import sell, buy
 from app.config import payer_keypair, MAIN_RPC
 from app.global_bot import GlobalBot
-from app.utils import get_token_balance, find_data
+from app.utils import get_token_balance as gtb, find_data
 
 # from playsound import playsound
 
 
 logging.basicConfig(
-    filename='logs/telegam_bot.log',
-    filemode='a',
+#    filename='logs/telegam_bot.log',
+#    filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
     )
@@ -56,33 +56,30 @@ class RaydiumSniper:
         self.df = pd.DataFrame(self.pool_data)
         self.is_tracking_pnl = True
         self.pnl_percentage = 0
-    
+
     async def get_balance(self):
         try:
             # Mainnet RPC endpoint (replace with your preferred endpoint)
             rpc_url = "https://api.mainnet-beta.solana.com"
-            
+
             # Create an async Solana client
             async with AsyncClient(rpc_url) as client:
                 # Get account info
                 account_info = await client.get_account_info(self.payer_pubkey )
-                
+
                 # Check if account exists
                 if account_info.value is None:
-                    logging.error(f"Account {self.payer_pubkey} does not exist.")
+
                     print(f"Account {self.payer_pubkey} does not exist.")
                     return 0.0
-                
+
                 # Get balance in lamports (1 SOL = 10^9 lamports)
-                balance_lamports = account_info.value.lamports
-                
+                balance_lamports = account_info.value.lamports 
                 # Convert lamports to SOL
                 balance_sol = balance_lamports / 10**9
-                
                 return balance_sol
-        
+
         except Exception as e:
-            logging.error(f"Error fetching balance: {str(e)}")
             print(f"Error fetching balance: {e}")
             return 0.0
 
@@ -91,22 +88,21 @@ class RaydiumSniper:
         logging.info("Getting new Raydium pool...")
         cprint("Getting new Raydium pool...", "green", attrs=["bold", "reverse"])
         for attempt in range(max_retries):
-            try:    
+            try:
                 data = await find_new_tokens(self.RaydiumLPV4)
-                if data:                    
+                if data:
                     self.base, self.mint, self.pair_address = data
                     return data
             except Exception as e:
-                logging.error(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}")
-                cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}", "red", attrs=["bold"])
+                cprint(f"Error in main loop (attempt {attempt + 1}/{max_retries}): {str(e)}")
                 await asyncio.sleep(retry_delay)
         return False
-    
+
     async def check_if_rug(self, mint_token=None):
-        score = "no data"
+
         link_to_token = f"https://dexscreener.com/solana/{self.pair_address}"
         link_to_rugcheck = f"https://rugcheck.xyz/tokens/{self.mint}"
-        logging.info("Checking if the token is a rug...")
+
         for i in range(2):
             if i == 1:
                 await asyncio.sleep(40)
@@ -115,50 +111,46 @@ class RaydiumSniper:
                     mint_token = self.mint
                 r = requests.get(f"https://api.rugcheck.xyz/v1/tokens/{self.mint}/report")
                 cprint(f"Status code: {r.status_code} - {r.reason}", "yellow")
-                logging.debug(f"Status code: {r.status_code} - {r.reason} -- https://api.rugcheck.xyz/v1/tokens/{self.mint}/report")
-                if r.status_code == 200:                
+
+                if r.status_code == 200:
                     data = r.json()
                     score = data['score']
                     cprint(f"Score: {score}", "yellow")
                     self.token_name = data['tokenMeta']['name']
                     self.token_symbol = data['tokenMeta']['symbol']
-                    logging.debug(f"New token  {data['tokenMeta']['symbol']} ({data['tokenMeta']['name']})  score: {score} ")
-                    print(colored(data["tokenMeta"]["symbol"], "blue", attrs=["bold"]), end="  ( ")
-                    print(colored(data["tokenMeta"]["name"], "green", attrs=["bold"]), ")")
 
-                    await self.global_bot.send_message(f"""
-✔️**New token**: [{data['tokenMeta']['symbol']} ({data['tokenMeta']['name']})]({link_to_token})
-📊**Score**: [{score}]({link_to_rugcheck})""")
+                    print(f'{data["tokenMeta"]["symbol"]} ({data["tokenMeta"]["name"]})')
+
+#                    await self.global_bot.send_message(f"""
+# ✔️**New token**: [{data['tokenMeta']['symbol']} ({data['tokenMeta']['name']})]({link_to_token})
+# 📊**Score**: [{score}]({link_to_rugcheck})""")
+                    dangers = []
                     for risk in data['risks']:
-                        cprint(f"{risk['name']} - {risk['level']}", "cyan", "on_white", attrs=["bold"])
+
                         logging.debug(f"{risk['name']} - {risk['level']}")
-                        if_danger = "🛑" if risk['level'] == "danger" else "✅"
-                        await self.global_bot.send_message(f"{if_danger} {risk['name']} - {risk['level']}")
                         if risk["name"] == "Freeze Authority still enabled":
-                            # playsound('app/raydium_py/signals/extra_special.mp3')
                             cprint("Tokens can be frozen and prevented from trading !!!","red", attrs=["bold", "reverse"])
                             return False
-                        # if risk["name"] == "Copycat token":
-                        #     cprint("Copycat token !!!","red", attrs=["bold", "reverse"])
-                        #     return False
                         if risk["level"] == "danger":
-                            # playsound('app/raydium_py/signals/extra_special.mp3')
-                            cprint(f"Risk level: {risk['level']}", "red", attrs=["bold", "reverse"])
-                            return False
+                            dangers.append(f"{risk['name']}")
+
+                    if "Low Liquidity" in dangers and len(dangers) == 1:
+                        await self.global_bot.send_message(f"🔴 Risks 🔴: {dangers}🔴")
+                        return True
                     return True
-                
+
             except Exception as e:
-                logging.error(f"Error in check_if_rug: {str(e)}")
-                cprint(f"Error in check_if_rug: {str(e)}", "red", attrs=["bold", "reverse"])
+
+                cprint(f"Error in check_if_rug: {str(e)}")
                 return False
-        
-        await self.global_bot.send_message(f"""
-⚠️ New token: [⚠️]({link_to_token})
-📈Score: [{score}]({link_to_rugcheck})""")
+
+#         await self.global_bot.send_message(f"""
+# ⚠️ New token: [⚠️]({link_to_token})
+# 📈Score: [{score}]({link_to_rugcheck})""")
         return False
-    
+
     async def buy(self, pair_address=None):
-        logging.info("Buying token...")
+        print("Buying token...")
         confirm = False
         for _ in range(4):
             self.buy_txn_signature, confirm = buy(str(self.pair_address), self.sol_in, self.slippage)
@@ -166,22 +158,23 @@ class RaydiumSniper:
                 return confirm
 
             await asyncio.sleep(4)
-        return False  
-        
+        return False
+
     async def sell(self, percentage=100):
         logging.info("Selling token...")
+        print("Selling token...")
         try:
             for attempt in range(3):
-                confirm, self.sell_txn_signature = sell(str(self.pair_address), percentage)
+                confirm, self.sell_txn_signature, sold_token_amount = sell(str(self.pair_address), percentage)
                 if confirm:
-                    # playsound('app/raydium_py/signals/sell.mp3')
-                    self.token_amount = get_token_balance(str(self.mint))
-                    
+#                    self.token_amount = gtb(str(self.mint))
+
                     await self.global_bot.send_message(f"""
 💹 Token {self.token_symbol} Sold Successfully!!!
-Rest amount: {self.token_amount} {self.token_symbol}
+Rest amount: {self.token_amount - sold_token_amount} {self.token_symbol}
                     """)
-                    logging.info(f"Token {self.token_symbol} Sold Successfully!!! Rest amount: {self.token_amount} {self.token_symbol}")
+                    print(f"Token {self.token_symbol} sold successfully!!! Rest amount: {self.token_amount - sold_token_amount} {self.token_symbol}")
+                    self.token_amount -= sold_token_amount
                     return confirm
                 await asyncio.sleep(2)
             return False
@@ -191,21 +184,20 @@ Rest amount: {self.token_amount} {self.token_symbol}
             return False
 
     async def get_sell_price(self, txn_sgn=None):
-        logging.info("Getting sell price...")
+        print("Getting sell price...")
         try:
             price_data = self.tracker.get_current_price(self.sell_txn_signature)
             if price_data:
-                    self.sold_price, self.token_amount, _, swap_commision = price_data
+                    self.sold_price, _, _, swap_commision = price_data
                     sell_info = f"""
 Sell Price: {self.sold_price:.10f} SOL
 Token Amount: {self.token_amount} {self.token_symbol}
                             """
                     await self.global_bot.send_message(sell_info)
-                    logging.info(sell_info)
+                    print(sell_info)
                     return price_data
         except Exception as e:
-            logging.error(f"Ошибка при получении цены продажи: {str(e)}")
-            # cprint(f"Ошибка при получении цены продажи: {e}", "red", attrs=["bold", "reverse"])
+            cprint(f"Ошибка при получении цены продажи: {e}", "red", attrs=["bold", "reverse"])
 
     async def get_bought_price(self):
         logging.info("Getting buy price...")
@@ -215,127 +207,132 @@ Token Amount: {self.token_amount} {self.token_symbol}
                 if self.bought_price:
                      return
             except Exception as e:
-                logging.error(f"Ошибка при получении цены покупки: {str(e)}")
-                # cprint(f"Ошибка при получении цены покупки: {e}", "red", attrs=["bold", "reverse"])
+                cprint(f"Ошибка при получении цены покупки: {e}")
                 time.sleep(3)
-      
+
     async def track_pnl_and_sell(self, first_tp, second_tp, sp=None):
         cprint("tracking PnL...", "green", attrs=["bold"])
         logging.info("\nTracking PnL...")
         last_pnl = 0
         err_amount = 0
         while self.is_tracking_pnl:
-            try:        
-                await asyncio.sleep(4)
+            try:
+                await asyncio.sleep(4.5)
                 pnl_percentage = self.tracker.get_pnl(
                     self.bought_price
                 )
                 self.pnl_percentage = pnl_percentage
 
-                self.token_amount = get_token_balance(str(self.mint))
-                logging.info(f"Token amount: {self.token_amount}")
-
-                if self.token_amount is None or self.token_amount < 1:
-                    if err_amount < 3:
-                        err_amount += 1
-                        continue
-
-                    cprint("Token amount {self.token_amount} is less than 1 or not exists!!!", "red", attrs=["bold", "reverse"])
-                    self.is_tracking_pnl = False
-                    return True
+                if self.token_amount < 1:
+                    cprint("Token amount {self.token_amount} is less than 1!!!")
+                    await self.global_bot.send_message(f"""
+Token amount {self.token_amount} is less than 1!!!
+  🔵🟡🔴     Check on wallet!    🔴🟡🔵
+                    """)
+#                    self.is_tracking_pnl = False
+#                    return True
 
                 if pnl_percentage < -90:
                     continue
                 if pnl_percentage > 3000:
                     continue
-                color_pnl = "green" if pnl_percentage > 0 else "red"
+                color_pnl = "🟢" if pnl_percentage > 0 else "🔴"
                 if pnl_percentage > last_pnl + 20:
-                    cprint(f"Price changed by {pnl_percentage - last_pnl:.2f}%!!!", "green", attrs=["bold", "reverse"])
-                    cprint(f"Current PnL: {pnl_percentage:.2f}", color_pnl, attrs=["bold", "reverse"])
-                    logging.info(f"Price changed by {pnl_percentage - last_pnl:.2f}%!!! Current PnL: {pnl_percentage}")
+                    cprint(f"Price changed by {pnl_percentage - last_pnl:.2f}%!!!")
+                    cprint(f"Current PnL: {pnl_percentage:.2f} /// Token amount: {self.token_amount}")
+                    await self.global_bot.send_message(f"""
+💹 Token {self.token_symbol}. 🟢  Price changed by {pnl_percentage - last_pnl:.2f}%!!!
+{color_pnl}  Current PnL: {pnl_percentage:.2f}  {color_pnl}
+Amount: {self.token_amount} {self.token_symbol}
+                    """)
                     last_pnl = pnl_percentage
 
-                if pnl_percentage < last_pnl - 20: 
-                    cprint(f"Price changed by {pnl_percentage - last_pnl:.2f}%!!!", "red", attrs=["bold", "reverse"])
-                    cprint(f"Current PnL: {pnl_percentage:.2f}", color_pnl, attrs=["bold", "reverse"])
-                    logging.info(f"Price changed by {pnl_percentage - last_pnl:.2f}%!!! Current PnL: {pnl_percentage}")
+                if pnl_percentage < last_pnl - 20:
+                    cprint(f"Price changed by {pnl_percentage - last_pnl:.2f}%!!!")
+                    cprint(f"Current PnL: {pnl_percentage:.2f}  /// Token amount: {self.token_amount}")
+                    await self.global_bot.send_message(f"""
+💹 Token {self.token_symbol}. 🔴  Price changed by {pnl_percentage - last_pnl:.2f}%!!!
+{color_pnl}  Current PnL: {pnl_percentage:.2f}  {color_pnl}
+Amount: {self.token_amount} {self.token_symbol}
+                    """)
                     last_pnl = pnl_percentage
 
-                if self.pnl_percentage >= second_tp:
+                if pnl_percentage >= second_tp:
                     await self.sell(100)
-                    cprint(f"Rest of amount{self.token_amount}", "magenta", attrs=["bold"])
+                    await asyncio.sleep(3)
+                    cprint(f"Rest of amount: {self.token_amount}", "magenta", attrs=["bold"])
+                    await self.global_bot.send_message(f"Rest of amount {self.token_amount}")
                     self.is_tracking_pnl = False
                     return True
                 elif self.pnl_percentage > first_tp:
                     cprint(f"Take profit : {first_tp}", "cyan", attrs=["bold"])
                     await self.sell(60)
-                    cprint(f"Rest of amount{self.token_amount}", "magenta", attrs=["bold"])
-                    first_tp +=90
+                    await asyncio.sleep(3)
+                    await self.global_bot.send_message(f"Rest of amount {self.token_amount}")
+                    cprint(f"Rest of amount {self.token_amount}", "magenta", attrs=["bold"])
+                    sp = first_tp / 3
+                    first_tp += 80
                 if sp and self.pnl_percentage <= sp:
                     await self.sell(100)
-                    cprint(f"Rest of amount{self.token_amount}", "magenta", attrs=["bold"])
+                    await asyncio.sleep(3)
+                    await self.global_bot.send_message(f"Rest of amount {self.token_amount}")
+                    cprint(f"Rest of amount {self.token_amount}", "magenta", attrs=["bold"])
                     self.is_tracking_pnl = False
                     return True  
 
 
             except Exception as e:
-                    logging.error(f"Error while tracking PnL: {str(e)}")
-                    # cprint(f"Error while tracking PnL: {str(e)}", "red", attrs=["bold", "reverse"])
+                    cprint(f"Error while tracking PnL: {str(e)}", "red", attrs=["bold", "reverse"])
                     if  "cannot access local variable 'pnl' where it is not associated with a value" in str(e):
                         logging.error("cannot access local variable 'pnl' where it is not associated with a value")
-                        
+
     async def run(self):
-        
-        while True:     
+
+        while True:
 
             new_pool = await self.get_new_raydium_pool(5, 2)
-            # playsound('app/raydium_py/signals/combat_warning.mp3')
+
             cprint(f"Dexscreener URL with my txn: https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey}", "yellow", "on_blue")
             cprint(f"GMGN SCREENER URL : https://gmgn.ai/sol/token/{self.mint}", "light_magenta")
             await asyncio.sleep(7)
 
-            rugcheck = await self.check_if_rug()            
+            rugcheck = await self.check_if_rug()
 
             if rugcheck and new_pool:
-                # playsound('app/raydium_py/signals/76a24c7c8089950.mp3')
-                
-
                 token_info = f"""
-🚀 Rug checked!!!
-💼Token: {self.token_symbol} ({self.token_name})
+🚀 [Rug checked!!!](https://rugcheck.xyz/tokens/{self.mint})
+💼 Token: {self.token_symbol} ({self.token_name})
 [Dexscreener](https://dexscreener.com/solana/{self.pair_address}?maker={self.payer_pubkey})🔹[GMGN](https://gmgn.ai/sol/token/{self.mint})🔹[Birdeye](https://www.birdeye.so/token/{self.mint}?chain=solana)
                 """
 
                 await self.global_bot.send_message(token_info)
 
-                logging.info(token_info)
+                print(token_info)
 
                 self.tracker = RaydiumPnLTracker(self.pair_address, self.base, self.mint)
                 await asyncio.sleep(2)
                 confirm =  await self.buy()
                 if not confirm:
                     not_confirmed = f"Failed to buy token: {self.token_symbol}"
-                    logging.info(not_confirmed)
+                    print(not_confirmed)
                     await self.global_bot.send_message(f"❌ {not_confirmed} ❌")
-                    cprint(not_confirmed, "magenta", attrs=["bold", "reverse"])
                 elif confirm:
-                    # playsound('app/raydium_py/signals/buy.mp3')                      
                     await self.get_bought_price()
                     if self.bought_price:
-                        buy_info = f"""       
+                        buy_info = f"""
     💹 Token Bought Successfully:
     Buy Price: {self.bought_price:.10f} SOL
     Token Amount: {self.token_amount} {self.token_symbol}
                         """
                         await self.global_bot.send_message(buy_info)
-                        logging.info(buy_info)
+                        print(buy_info)
 
-                        sell_confirm = await self.track_pnl_and_sell(90, 1000)
+                        sell_confirm = await self.track_pnl_and_sell(70, 300)
 
                         if sell_confirm:
-                            logging.info("Sell transaction confirmed")
+                            print("Sell transaction confirmed")
             else:
-                continue 
+                continue
 
 if __name__ == "__main__":
     SOL_IN = 0.03

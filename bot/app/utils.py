@@ -13,7 +13,7 @@ from solders.pubkey import Pubkey  # type: ignore
 
 from termcolor import cprint
 
-from app.config import MAIN_RPC, client, payer_keypair
+from app.config import RPC, client, payer_keypair
 from app.constants import (
     OPEN_BOOK_PROGRAM,
     RAY_AUTHORITY_V4,
@@ -28,7 +28,7 @@ from app.layouts import (
 )
 
 logging.basicConfig(
-    filename='logs/telegam_bot.log',
+    filename='telegam_bot.log',
     filemode='a',
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
@@ -97,7 +97,7 @@ def make_swap_instruction(
 
 
 def fetch_pool_keys(pair_address: str) -> dict:
-    try:
+    # try:
         amm_id = Pubkey.from_string(pair_address)
         amm_data = client.get_account_info_json_parsed(amm_id).value.data
         amm_data_decoded = LIQUIDITY_STATE_LAYOUT_V4.parse(amm_data)
@@ -126,11 +126,11 @@ def fetch_pool_keys(pair_address: str) -> dict:
         }
 
         return pool_keys
-    except Exception as e:
-        cprint(f"Error fetching pool keys in utils.py module: {e}",
-               "red", attrs=["bold", "reverse"])
-        logging.error(f"Error fetching pool keys: {str(e)}")
-        return None
+    # except Exception as e:
+    #     cprint(f"Error fetching pool keys in utils.py module: {e}",
+    #            "red", attrs=["bold", "reverse"])
+    #     logging.error(f"Error fetching pool keys: {str(e)}")
+    #     return None
 
 
 def find_data(data: Union[dict, list], field: str) -> Optional[str]:
@@ -169,7 +169,7 @@ def get_token_balance(mint_str: str):
             ],
         }
 
-        response = requests.post(MAIN_RPC, json=payload, headers=headers)
+        response = requests.post(RPC, json=payload, headers=headers)
         ui_amount = find_data(response.json(), "uiAmount")
         return float(ui_amount)
     except Exception as e:
@@ -231,7 +231,7 @@ def get_pair_address(mint):
 
 
 def get_token_price(pool_keys: dict) -> tuple:
-    try:
+    # try:
         base_vault = pool_keys["base_vault"]
         quote_vault = pool_keys["quote_vault"]
         base_decimal = pool_keys["base_decimals"]
@@ -268,7 +268,7 @@ def get_token_price(pool_keys: dict) -> tuple:
 
         return token_price, token_decimal
 
-    except Exception as e:
-        cprint(f"Error occurred: {e}", "red", attrs=["bold", "reverse"])
-        logging.error(f"Error occurred: {str(e)}")
-        return None, None
+    # except Exception as e:
+    #     cprint(f"Error occurred: {e}", "red", attrs=["bold", "reverse"])
+    #     logging.error(f"Error occurred: {str(e)}")
+    #     return None, None

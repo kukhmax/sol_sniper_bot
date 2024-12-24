@@ -12,13 +12,14 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 from app.global_bot import GlobalBot
 from app.sniper_bot import RaydiumSniper
+from bot.scrap_tg_bot import main
 
 
 dotenv.load_dotenv()
 
 logging.basicConfig(
-    filename='logs/telegam_bot.log',
-    filemode='a',
+#    filename='logs/telegam_bot.log',
+#    filemode='a',
     level=logging.DEBUG, 
     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
     )
@@ -77,7 +78,7 @@ class RaydiumTelegramBot:
                 ]
             ], resize_keyboard=True)
             
-            await message.answer("Welcome to Raydium Sniper Bot!", reply_markup=keyboard)
+            await message.answer("🏆Welcome to Raydium Sniper Bot!🏆", reply_markup=keyboard)
         
         @self.dp.message()
         async def handle_messages(message: types.Message):
@@ -104,8 +105,6 @@ class RaydiumTelegramBot:
         # Получаем ID чата
         chat_id = message.chat.id
         user_id = message.from_user.id
-        username = message.from_user.username
-        full_name = message.from_user.full_name
         
         # Сохраняем chat_id в экземпляре класса
         self.chat_id = chat_id
@@ -115,9 +114,6 @@ class RaydiumTelegramBot:
 🆔 Информация о чате:
 Chat ID: {chat_id}
 User ID: {user_id}
-Username: @{username}
-Full Name: {full_name}
-
 ✅ Chat ID сохранен для использования в боте!
         """
 
@@ -142,7 +138,7 @@ Full Name: {full_name}
             )
             self.sniper_task = asyncio.create_task(self.sniper.run())  # Создаем задачу для снайпера
             self.is_sniper_active = True
-            await message.answer("🚀 Sniper Bot Started Successfully!")
+            await message.answer("🚀 Sniper Bot Started Successfully!🚀 ")
         else:
             await message.answer("⚠️ Sniper Bot is already running!")
 
@@ -268,6 +264,7 @@ Token Amount: {self.sniper.token_amount}
 
 # Usage
 if __name__ == "__main__":
-    BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    raydium_bot = RaydiumTelegramBot(BOT_TOKEN)
-    raydium_bot.start()
+    # BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+    # raydium_bot = RaydiumTelegramBot(BOT_TOKEN)
+    # raydium_bot.start()
+    asyncio.run(main())
