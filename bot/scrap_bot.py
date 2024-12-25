@@ -9,6 +9,7 @@ from datetime import datetime
 from termcolor import colored, cprint
 from telethon import TelegramClient, events
 from app.utils import get_token_price, fetch_pool_keys
+from solana.exceptions import SolanaRpcException
 
 from dotenv import load_dotenv
 
@@ -19,7 +20,7 @@ load_dotenv()
 API_ID = os.getenv('API_ID')  # Получите на https://my.telegram.org/apps
 API_HASH = os.getenv('API_HASH')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-PHONE_NUMBER = os.getenv('PHONE_NUMBER', "+4098177")
+PHONE_NUMBER = os.getenv('PHONE_NUMBER')
 
 
 # ID чатов
@@ -53,6 +54,90 @@ def rugcheck(mint):
     except Exception as e:
         logging.error(f"Error rugchecking: {str(e)}")
         return None
+    
+async def track_price(
+        pool_keys, symbol, token_name, pair_address,
+        start_price, client
+):
+    last_pnl = 0
+    pnl_message = None
+    max_pnl = 0
+
+    STOP_LOSS = -10
+    TARGET = 50
+
+    while True:
+        try:
+            current_price, _ = get_token_price(pool_keys)                            
+            pnl = ((current_price - start_price) / start_price) * 100
+
+            max_pnl = max(max_pnl, pnl)
+
+            if pnl >= TARGET:
+                STOP_LOSS = TARGET - 40
+                TARGET += 50
+
+            color_pnl = "🟢🟢🟢" if pnl > 0 else "🔴🔴🔴"
+
+            if pnl > last_pnl + 25:
+                cprint(f"{token_name}       Price changed by {pnl - last_pnl:.2f}%!!!", "green", attrs=["bold", "reverse"])
+                print(f"Current price  {token_name}: {current_price:.10f}")
+                pnl_message = f"""
+✔️        **{symbol}** 💹  [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) 
+🟢  Price changed by {pnl - last_pnl:.2f}%!!! 🟢
+**[Buy price]**           {start_price:.10f}
+**[Current price]**       {current_price:.10f}
+**Stop  loss:** {STOP_LOSS}%  ®️  **Max PnL:** {max_pnl:.2f}%
+{color_pnl}  Current PnL: {pnl:.2f}  {color_pnl}
+                                """
+                last_pnl = pnl
+
+            if pnl < last_pnl - 25:
+                cprint(f"{token_name}       Price changed by {pnl - last_pnl:.2f}%!!!", "red", attrs=["bold", "reverse"])
+                print(f"Current price  {token_name}: {current_price:.10f}")
+                pnl_message = f"""
+✔️        **{symbol}** 🆘  [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) 
+🔴  Price changed by {pnl - last_pnl:.2f}%!!!  🔴
+**[Buy price]**           {start_price:.10f} 
+**[Current price]**       {current_price:.10f}
+**Stop  loss:**  {STOP_LOSS}%  ®️  **Max PnL:** {max_pnl:.2f}%
+{color_pnl}  Current PnL: {pnl:.2f}  {color_pnl}
+                                """
+                last_pnl = pnl
+
+            if pnl <= STOP_LOSS:
+                print(f"Current pnl {token_name}: {pnl:.2f}")
+                pnl_side = "❇️🟩❇️" if pnl > 0 else "❌⭕️❌"
+
+                                
+                await client.send_message(TARGET_CHAT_ID, f"""
+🎯      **{symbol}**   🌐   [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) 
+**[Buy price]**           {start_price:.10f} 
+**[Current price]**       {current_price:.10f}
+**Max pnl:**     {max_pnl:.2f}%
+{pnl_side}  Stop Loss Hit  -  **{STOP_LOSS}%**  {pnl_side}
+{color_pnl}  Real PnL:   **{pnl:.2f}%**   {color_pnl}""",
+                                          parse_mode="Markdown",
+                                          link_preview=False)
+                return
+
+            if pnl_message:
+                await client.send_message(TARGET_CHAT_ID, 
+                                          pnl_message, 
+                                          parse_mode="Markdown",
+                                          link_preview=False)
+                pnl_message = None
+            await asyncio.sleep(9)
+
+        except SolanaRpcException:
+            cprint("Solana RPC error. Retrying...", "red", attrs=["bold", "reverse"])
+            await asyncio.sleep(2.5)
+            continue
+
+        except Exception as e:
+            cprint(f"Error tracking pnl: {str(e)}", "red", attrs=["bold", "reverse"])
+            print(traceback.format_exc())
+            continue
 
 async def main():
     # Создаем клиент Telegram
@@ -87,142 +172,29 @@ async def main():
                     if is_no_danger:
 
                         message = f"""
-🔥  **{symbol}**     |    [{token_name}](https://t.me/solearlytrending/{event.message.id})
+🔠🔠🔠  **{symbol}**     |    [{token_name}](https://t.me/solearlytrending/{event.message.id})
 ⏰  __Time__:  __{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}__
-📅  __Age__:   **{age}**
-
-📊  __Score__:   [{score}]({f"https://rugcheck.xyz/tokens/{mint}"})
-⚖️  **Risks**:   __{'\\n        '.join(risk_descriptions)}__
-
-📈  [DexScreener](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc)
-📈  [GMGN](https://gmgn.ai/sol/token/{mint})
-                    """
+📅  __Age__:   **{age}** 
+        ⚖️  **Risks**  ⚖️       🔸[{score}]({f"https://rugcheck.xyz/tokens/{mint}"})🔸
+ __{'\\n        '.join(risk_descriptions)}__
+    [DexScreener](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc)  📈  [GMGN](https://gmgn.ai/sol/token/{mint})
+                        """
                         # Пересылаем сообщение в целевой чат
                         await client.send_message(TARGET_CHAT_ID, message, parse_mode="Markdown",
                                                 link_preview=False)
                         print(f"Message forwarded to target chat: {event.message.id}")
-
+                        
                         pool_keys = fetch_pool_keys(pair_address)
 
-                        start_price, _ = get_token_price(pool_keys)
-                        cprint(f"Start price  {token_name}: {start_price:.10f}", "light_cyan")
+                        if pool_keys:
 
-                        last_pnl = 0
-                        tracking = True
-                        count = 0
-                        target = 0
-                        pnl_message = ""
+                            start_price, _ = get_token_price(pool_keys)
+                            cprint(f"Start price  {token_name}: {start_price:.10f}", "light_cyan")
 
-                        while tracking:
-                            try:
-                                current_price, _ = get_token_price(pool_keys)                            
-                                pnl = ((current_price - start_price) / start_price) * 100
-
-                                color_pnl = "🟢" if pnl > 0 else "🔴"
-
-                                if pnl > last_pnl + 20:
-                                    cprint(f"{token_name}       Price changed by {pnl - last_pnl:.2f}%!!!", "green", attrs=["bold", "reverse"])
-                                    print(f"Current price  {token_name}: {current_price:.10f}")
-                                    pnl_message = f"""
-            💹  **{symbol}** | [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) .
-    🟢🟢  Price changed by {pnl - last_pnl:.2f}%!!! 🟢🟢
-    **[Buy price]**       {start_price:.10f}
-    **[Current price]**       {current_price:.10f}
-            {color_pnl}  Current PnL: {pnl:.2f}  {color_pnl}
-                                """
-                                    last_pnl = pnl
-
-                                elif pnl < last_pnl - 20:
-                                    cprint(f"{token_name}       Price changed by {pnl - last_pnl:.2f}%!!!", "red", attrs=["bold", "reverse"])
-                                    print(f"Current price  {token_name}: {current_price:.10f}")
-                                    pnl_message = f"""
-            🆘  **{symbol}** | [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) .
-    🔴🔴  Price changed by {pnl - last_pnl:.2f}%!!!  🔴🔴
-    **[Buy price]**       {start_price:.10f} 
-    **[Current price]**       {current_price:.10f}
-            {color_pnl}  Current PnL: {pnl:.2f}  {color_pnl}
-                                """
-                                    last_pnl = pnl
-
-                                if pnl <= -10:
-                                    print(f"Current pnl {token_name}: {pnl:.2f}")
-                                    if count == 1:
-                                        tracking = False
-                                    
-                                        pnl_message = f"""
-🆘  **{symbol}** | [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) .
-        🔴🔴🔴  Current PnL: {pnl:.2f} 🔴🔴🔴
-        **[Buy price]**       {start_price:.10f} 
-        **[Current price]**       {current_price:.10f}
-         🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
-             Achived target **-15%**
-         🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴"""
-                                    count += 1
-                                    await asyncio.sleep(2)
-                                    continue
-
-                                elif pnl >= 300:
-                                    tracking = False
-                                    pnl_message = f"""
-💹  **{symbol}** | [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) .
-        🟢🟢🟢  Current PnL: {pnl:.2f} 🟢🟢🟢
-        **[Buy price]**       {start_price:.10f} 
-        **[Current price]**       {current_price:.10f}
-         🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢
-             Achived target **500%**   
-         🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢"""  
-
-                                elif pnl >= 50 and pnl < 100:
-                                    if target == 100 or target == 200 or target == 50:
-                                        continue
-                                    pnl_message = f"""
-💹  **{symbol}** | [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) .
-        🟢🟢🟢  Current PnL: {pnl:.2f} 🟢🟢🟢
-        **[Buy price]**       {start_price:.10f} 
-        **[Current price]**       {current_price:.10f}
-         🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢
-           ❗️❗️❗️  **50%**   ❗️❗️❗️
-         🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢"""
-                                    target = 50                         
-
-                                elif pnl >= 100 and pnl < 200:
-                                    if target == 200 or target == 100:
-                                        continue
-                                    pnl_message = f"""
-💹  **{symbol}** | [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) .
-        🟢🟢🟢  Current PnL: {pnl:.2f} 🟢🟢🟢
-        **[Buy price]**       {start_price:.10f} 
-        **[Current price]**       {current_price:.10f}
-         🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢
-             ❗️❗️❗️ **100%**  ❗️❗️❗️ 
-         🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢"""
-                                    target = 100
-
-                                elif pnl >= 200 and pnl < 300:
-                                    if target == 200:
-                                        continue
-                                    pnl_message = f"""
-💹  **{symbol}** | [{token_name}](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc) .
-        🟢🟢🟢  Current PnL: {pnl:.2f} 🟢🟢🟢
-        **[Buy price]**       {start_price:.10f} 
-        **[Current price]**       {current_price:.10f}
-         🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢
-             ❗️❗️❗️ **100%**  ❗️❗️❗️ 
-         🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢"""
-                                    target = 200
-
-                                if pnl_message:
-                                    await client.send_message(TARGET_CHAT_ID, pnl_message, parse_mode="Markdown",
-                                                            link_preview=False)
-                                    pnl_message = None
-
-
-                                await asyncio.sleep(10)
-
-                            except Exception as e:
-                                print(f"Error tracking pnl: {str(e)}")
-                                print(traceback.format_exc())
-                                continue
+                            await track_price(
+                                pool_keys, symbol, token_name,
+                                pair_address, start_price, client
+                            )
 
         except Exception as e:
             print(f"Error processing message: {str(e)}")

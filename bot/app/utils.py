@@ -97,7 +97,7 @@ def make_swap_instruction(
 
 
 def fetch_pool_keys(pair_address: str) -> dict:
-    # try:
+    try:
         amm_id = Pubkey.from_string(pair_address)
         amm_data = client.get_account_info_json_parsed(amm_id).value.data
         amm_data_decoded = LIQUIDITY_STATE_LAYOUT_V4.parse(amm_data)
@@ -126,11 +126,11 @@ def fetch_pool_keys(pair_address: str) -> dict:
         }
 
         return pool_keys
-    # except Exception as e:
-    #     cprint(f"Error fetching pool keys in utils.py module: {e}",
-    #            "red", attrs=["bold", "reverse"])
-    #     logging.error(f"Error fetching pool keys: {str(e)}")
-    #     return None
+    except Exception as e:
+        cprint(f"Error fetching pool keys in utils.py module: {e}",
+               "red", attrs=["bold", "reverse"])
+        logging.error(f"Error fetching pool keys: {str(e)}")
+        return None
 
 
 def find_data(data: Union[dict, list], field: str) -> Optional[str]:
