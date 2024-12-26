@@ -27,6 +27,9 @@ PHONE_NUMBER = os.getenv('PHONE_NUMBER')
 SOURCE_CHAT_ID = int(os.getenv('SOURCE_CHAT_ID', '-1002093384030'))
 TARGET_CHAT_ID = int(os.getenv('TARGET_CHAT_ID', '7475229862'))
 
+# Dictionary to store user states
+user_states = {}
+
 
 def rugcheck(mint):
     try:
@@ -73,14 +76,14 @@ async def track_price(
 
             max_pnl = max(max_pnl, pnl)
 
-            if max_pnl >= TARGET:
+            if max_pnl > TARGET:
                 STOP_LOSS = max_pnl - 45 if max_pnl > 55 else 10
-                TARGET = max_pnl + 50
+                TARGET = max_pnl
                 cprint(f"New stop loss: {STOP_LOSS}", "green", attrs=["bold", "reverse"])
 
             color_pnl = "🟢🟢" if pnl > 0 else "🔴🔴"
 
-            if pnl > last_pnl + 26:
+            if pnl > last_pnl + 30:
                 cprint(f"{token_name}       Price changed by {pnl - last_pnl:.2f}%!!!", "green", attrs=["bold", "reverse"])
                 print(f"Current price  {token_name}: {current_price:.10f}")
                 pnl_message = f"""
@@ -93,7 +96,7 @@ async def track_price(
                                 """
                 last_pnl = pnl
 
-            if pnl < last_pnl - 26:
+            if pnl < last_pnl - 30:
                 cprint(f"{token_name}       Price changed by {pnl - last_pnl:.2f}%!!!", "red", attrs=["bold", "reverse"])
                 print(f"Current price  {token_name}: {current_price:.10f}")
                 pnl_message = f"""
@@ -177,7 +180,7 @@ async def main():
 ⏰  __Time__:  __{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}__
 📅  __Age__:   **{age}** 
         ⚖️  **Risks**  ⚖️       🔸[{score}]({f"https://rugcheck.xyz/tokens/{mint}"})🔸
- __{'\\n        '.join(risk_descriptions)}__
+ __{'\n '.join(risk_descriptions)}__
     [DexScreener](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc)  📈  [GMGN](https://gmgn.ai/sol/token/{mint})
                         """
                         # Пересылаем сообщение в целевой чат
