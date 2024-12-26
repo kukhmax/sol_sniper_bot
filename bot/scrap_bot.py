@@ -69,17 +69,18 @@ async def track_price(
     while True:
         try:
             current_price, _ = get_token_price(pool_keys)                            
-            pnl = ((current_price - start_price) / start_price) * 100
+            pnl = round(((current_price - start_price) / start_price) * 100, 2)
 
             max_pnl = max(max_pnl, pnl)
 
-            if pnl >= TARGET:
-                STOP_LOSS = TARGET - 40
-                TARGET += 50
+            if max_pnl >= TARGET:
+                STOP_LOSS = max_pnl - 45 if max_pnl > 55 else 10
+                TARGET = max_pnl + 50
+                cprint(f"New stop loss: {STOP_LOSS}", "green", attrs=["bold", "reverse"])
 
-            color_pnl = "🟢🟢🟢" if pnl > 0 else "🔴🔴🔴"
+            color_pnl = "🟢🟢" if pnl > 0 else "🔴🔴"
 
-            if pnl > last_pnl + 25:
+            if pnl > last_pnl + 26:
                 cprint(f"{token_name}       Price changed by {pnl - last_pnl:.2f}%!!!", "green", attrs=["bold", "reverse"])
                 print(f"Current price  {token_name}: {current_price:.10f}")
                 pnl_message = f"""
@@ -87,12 +88,12 @@ async def track_price(
 🟢  Price changed by {pnl - last_pnl:.2f}%!!! 🟢
 **[Buy price]**           {start_price:.10f}
 **[Current price]**       {current_price:.10f}
-**Stop  loss:** {STOP_LOSS}%  ®️  **Max PnL:** {max_pnl:.2f}%
-{color_pnl}  Current PnL: {pnl:.2f}  {color_pnl}
+**Stop  loss:** {STOP_LOSS:.2f}%  ®️  **Max PnL:** {max_pnl:.2f}%
+{color_pnl}  Current PnL: **{pnl:.2f}**  {color_pnl}
                                 """
                 last_pnl = pnl
 
-            if pnl < last_pnl - 25:
+            if pnl < last_pnl - 26:
                 cprint(f"{token_name}       Price changed by {pnl - last_pnl:.2f}%!!!", "red", attrs=["bold", "reverse"])
                 print(f"Current price  {token_name}: {current_price:.10f}")
                 pnl_message = f"""
@@ -100,13 +101,13 @@ async def track_price(
 🔴  Price changed by {pnl - last_pnl:.2f}%!!!  🔴
 **[Buy price]**           {start_price:.10f} 
 **[Current price]**       {current_price:.10f}
-**Stop  loss:**  {STOP_LOSS}%  ®️  **Max PnL:** {max_pnl:.2f}%
-{color_pnl}  Current PnL: {pnl:.2f}  {color_pnl}
+**Stop  loss:**  {STOP_LOSS:.2f}%  ®️  **Max PnL:** {max_pnl:.2f}%
+{color_pnl}  Current PnL: **{pnl:.2f}**  {color_pnl}
                                 """
                 last_pnl = pnl
 
             if pnl <= STOP_LOSS:
-                print(f"Current pnl {token_name}: {pnl:.2f}")
+                cprint(f"Current pnl {token_name}: {pnl:.2f}", "light_magenta")
                 pnl_side = "❇️🟩❇️" if pnl > 0 else "❌⭕️❌"
 
                                 
@@ -115,8 +116,8 @@ async def track_price(
 **[Buy price]**           {start_price:.10f} 
 **[Current price]**       {current_price:.10f}
 **Max pnl:**     {max_pnl:.2f}%
-{pnl_side}  Stop Loss Hit  -  **{STOP_LOSS}%**  {pnl_side}
-{color_pnl}  Real PnL:   **{pnl:.2f}%**   {color_pnl}""",
+{pnl_side}  Stop Loss Hit  -  **{STOP_LOSS:.2f}%**  {pnl_side}
+                 Real PnL:   **{pnl:.2f}%** """,
                                           parse_mode="Markdown",
                                           link_preview=False)
                 return
@@ -172,7 +173,7 @@ async def main():
                     if is_no_danger:
 
                         message = f"""
-🔠🔠🔠  **{symbol}**     |    [{token_name}](https://t.me/solearlytrending/{event.message.id})
+🔠  **{symbol}**     |    [{token_name}](https://t.me/solearlytrending/{event.message.id})
 ⏰  __Time__:  __{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}__
 📅  __Age__:   **{age}** 
         ⚖️  **Risks**  ⚖️       🔸[{score}]({f"https://rugcheck.xyz/tokens/{mint}"})🔸
@@ -180,10 +181,12 @@ async def main():
     [DexScreener](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc)  📈  [GMGN](https://gmgn.ai/sol/token/{mint})
                         """
                         # Пересылаем сообщение в целевой чат
-                        await client.send_message(TARGET_CHAT_ID, message, parse_mode="Markdown",
-                                                link_preview=False)
+                        await client.send_message(TARGET_CHAT_ID,
+                                                  message,
+                                                  parse_mode="Markdown",
+                                                  link_preview=False)
                         print(f"Message forwarded to target chat: {event.message.id}")
-                        
+
                         pool_keys = fetch_pool_keys(pair_address)
 
                         if pool_keys:

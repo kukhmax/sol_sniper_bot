@@ -42,19 +42,21 @@ logging.basicConfig(
     )
 
 
-def buy(pair_address: str, sol_in: float = .01, slippage: int = 5) -> bool:
+def buy(pair_address: str, pool_keys=None, sol_in: float = .01, slippage: int = 5):
     try:
         cprint(f"Starting buy transaction for pair address: {pair_address}", "yellow", "on_blue", attrs=["bold"])
         logging.info(f"Starting buy transaction for pair address: {pair_address}")
-        
-        cprint("Fetching pool keys...", "green", attrs=["bold"])
-        pool_keys = fetch_pool_keys(pair_address)
-        if pool_keys is None:
-            cprint("No pool keys found...", "red", attrs=["bold", "reverse"])
-            logging.error("No pool keys found...")
-            return None, False
-        cprint("Pool keys fetched successfully.", "white", "on_green", attrs=["bold"])
-        logging.info("Pool keys fetched successfully.")
+
+        if pool_keys is None:        
+            cprint("Fetching pool keys...", "green", attrs=["bold"])
+            pool_keys = fetch_pool_keys(pair_address)
+
+            if pool_keys is None:
+                cprint("No pool keys found...", "red", attrs=["bold", "reverse"])
+                logging.error("No pool keys found...")
+                return None, False
+            cprint("Pool keys fetched successfully.", "white", "on_green", attrs=["bold"])
+            logging.info("Pool keys fetched successfully.")
 
         mint = pool_keys['base_mint'] if str(pool_keys['base_mint']) != SOL else pool_keys['quote_mint']
         
