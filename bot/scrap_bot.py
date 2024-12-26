@@ -77,9 +77,9 @@ async def track_price(
             max_pnl = max(max_pnl, pnl)
 
             if max_pnl > TARGET:
-                STOP_LOSS = max_pnl - 45 if max_pnl > 55 else 10
+                STOP_LOSS = 0 if max_pnl >= 30 and max_pnl < 55 else (max_pnl - 45 if max_pnl > 55 else -10)
                 TARGET = max_pnl
-                cprint(f"New stop loss: {STOP_LOSS}", "green", attrs=["bold", "reverse"])
+                cprint(f"New stop loss: {STOP_LOSS}", "green", attrs=["bold"])
 
             color_pnl = "🟢🟢" if pnl > 0 else "🔴🔴"
 
@@ -166,29 +166,14 @@ async def main():
                 cprint(f"Extracted age: {age}", "yellow")
 
                 cprint(f"GMGN URL: https://gmgn.ai/sol/token/{mint}", "light_magenta", "on_blue")
-                cprint(f"RugCheck URL: https://api.rugcheck.xyz/v1/tokens/{mint}/report", "light_red")
+                # cprint(f"RugCheck URL: https://api.rugcheck.xyz/v1/tokens/{mint}/report", "light_red")
 
                 # extract data from rugcheck.xyz
                 rug_check = rugcheck(mint)
                 
                 if rug_check:
                     pair_address, symbol, score, risk_descriptions, is_no_danger = rug_check
-                    if is_no_danger:
-
-                        message = f"""
-🔠  **{symbol}**     |    [{token_name}](https://t.me/solearlytrending/{event.message.id})
-⏰  __Time__:  __{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}__
-📅  __Age__:   **{age}** 
-        ⚖️  **Risks**  ⚖️       🔸[{score}]({f"https://rugcheck.xyz/tokens/{mint}"})🔸
- __{'\n '.join(risk_descriptions)}__
-    [DexScreener](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc)  📈  [GMGN](https://gmgn.ai/sol/token/{mint})
-                        """
-                        # Пересылаем сообщение в целевой чат
-                        await client.send_message(TARGET_CHAT_ID,
-                                                  message,
-                                                  parse_mode="Markdown",
-                                                  link_preview=False)
-                        print(f"Message forwarded to target chat: {event.message.id}")
+                    if is_no_danger:                        
 
                         pool_keys = fetch_pool_keys(pair_address)
 
@@ -196,6 +181,22 @@ async def main():
 
                             start_price, _ = get_token_price(pool_keys)
                             cprint(f"Start price  {token_name}: {start_price:.10f}", "light_cyan")
+
+                            message = f"""
+🔠  **{symbol}**     |    [{token_name}](https://t.me/solearlytrending/{event.message.id})
+⏰  __Time__:  __{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}__
+📅  __Age__:   **{age}**
+💰  **Price**: {start_price:.10f} {symbol}
+   ⚖️  **Risks**  ⚖️       🔸[{score}]({f"https://rugcheck.xyz/tokens/{mint}"})🔸
+ __{'\n '.join(risk_descriptions)}__
+    [DexScreener](https://dexscreener.com/solana/{pair_address}?maker=4NZNfmNPfejj2YvAqSzbKTukDbz5FTiwBAdifAAGVrMc)  📈  [GMGN](https://gmgn.ai/sol/token/{mint})
+                        """
+                        # Пересылаем сообщение в целевой чат
+                            await client.send_message(TARGET_CHAT_ID,
+                                                    message,
+                                                    parse_mode="Markdown",
+                                                    link_preview=False)
+                            print(f"Message forwarded to target chat: {event.message.id}")
 
                             await track_price(
                                 pool_keys, symbol, token_name,
