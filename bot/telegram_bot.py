@@ -12,17 +12,11 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 from app.global_bot import GlobalBot
 from app.sniper_bot import RaydiumSniper
-from bot.scrap_tg_bot import main
+
 
 
 dotenv.load_dotenv()
 
-logging.basicConfig(
-#    filename='logs/telegam_bot.log',
-#    filemode='a',
-    level=logging.DEBUG, 
-    format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
-    )
 
 class RaydiumTelegramBot:
     def __init__(self, bot_token):
@@ -264,7 +258,6 @@ Token Amount: {self.sniper.token_amount}
 
 # Usage
 if __name__ == "__main__":
-    # BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    # raydium_bot = RaydiumTelegramBot(BOT_TOKEN)
-    # raydium_bot.start()
-    asyncio.run(main())
+    BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+    raydium_bot = RaydiumTelegramBot(BOT_TOKEN)
+    raydium_bot.start()

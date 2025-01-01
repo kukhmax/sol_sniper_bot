@@ -22,12 +22,12 @@ from app.utils import get_token_balance as gtb, find_data
 # from playsound import playsound
 
 
-logging.basicConfig(
-#    filename='logs/telegam_bot.log',
-#    filemode='a',
-    level=logging.DEBUG, 
-    format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
-    )
+# logging.basicConfig(
+# #    filename='logs/telegam_bot.log',
+# #    filemode='a',
+#     level=logging.DEBUG, 
+#     format="%(asctime)s - %(levelname)s - %(message)s - [%(funcName)s:%(lineno)d]",
+#     )
 
 class RaydiumSniper:
     def __init__(self, sol_in, slippage, priority_fee, global_bot=None):

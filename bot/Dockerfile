@@ -1,4 +1,3 @@
-# Используем официальный образ Python
 FROM python:3.13-slim
 
 # Установка системных зависимостей
@@ -9,18 +8,19 @@ RUN apt-get update && apt-get install -y \
     libasound2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /app/logs
-
+# Создаем директории и устанавливаем права
+RUN mkdir -p /app/session /app/logs \
+    && chmod 777 /app/session /app/logs
 
 # Устанавливаем рабочую директорию
-WORKDIR /app
+WORKDIR /
 
 # Копируем все файлы в контейнер
 COPY . .
 
 # Обновляем pip и устанавливаем зависимости
-RUN pip install --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Указываем переменные окружения
 ENV PYTHONUNBUFFERED=1

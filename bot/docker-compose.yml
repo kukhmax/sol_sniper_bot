@@ -1,8 +1,25 @@
+version: '3.8'
+
 services:
   telegram-bot:
-    image: bot:latest
-    container_name: bot
-    env_file:
-      - .env
+    build: .
+    volumes:
+      - ./session:/app/session:rw
+      - ./logs:/app/logs:rw
+      - ./.env:/app/.env:ro
+    environment:
+      - TZ=Europe/Berlin
+      - PYTHONUNBUFFERED=1
+    user: "root"  # Временно используем root для отладки
     restart: unless-stopped
-    command: python scrap_bot.py
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M

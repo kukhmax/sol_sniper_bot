@@ -6,3 +6,8 @@ __pycache__
 .venv
 .exemples
 *.tar
+telegram_bot.py
+find_new_token.py
+global_bot.py
+*.log
+*.session
